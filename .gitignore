@@ -1,0 +1,71 @@
+# Private assessment, implementation prompts and working guidance
+/[Pp]lan/
+/docs/private/
+AGENTS.md
+IMPLEMENTATION_PLAN.md
+ACCEPTANCE_MATRIX.md
+DEMO_VIDEO_GUIDE.md
+Technical Assessment.pdf
+
+# Environment files and credentials; keep the safe configuration template
+.env
+.env.*
+!.env.example
+.secrets/
+secrets/
+credentials*.json
+*service-account*.json
+*.pem
+*.key
+.aws/
+.codex/
+.agents/
+
+# Local database records, dumps and uploaded originals
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.dump
+*.backup
+/data/
+/uploads/
+/storage/
+/backups/
+/supabase/.temp/
+/supabase/.branches/
+
+# Python environments, caches, build outputs and local tooling
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.uv-cache/
+.cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.egg-info/
+build/
+dist/
+.tox/
+.nox/
+node_modules/
+.idea/
+.vscode/
+
+# Runtime logs and temporary/demo capture files
+*.log
+/logs/
+/tmp/
+/temp/
+/recordings/
+.DS_Store
+Thumbs.db
+
+# README, app docs, migrations, uv.lock and fictional test fixtures remain trackable.
