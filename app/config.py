@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     xai_api_key: SecretStr = SecretStr("")
     max_file_bytes: int = 10 * 1024 * 1024
     max_pages: int = 8
-    provider_timeout: int = 45
+    provider_timeout: int = 120
     max_llm_calls: int = 3
     max_job_cost_usd: str = "0.10"
     input_usd_per_million: str = ""
