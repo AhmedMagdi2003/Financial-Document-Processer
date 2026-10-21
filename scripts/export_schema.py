@@ -19,5 +19,8 @@ if __name__ == "__main__":
         lines.append(f'ALTER TABLE "{table.name}" ENABLE ROW LEVEL SECURITY;')
     output = Path("supabase/migrations/001_initial.sql")
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text("\n\n".join(lines), encoding="utf-8")
+    rendered = "\n\n".join(lines)
+    output.write_text(
+        "\n".join(line.rstrip() for line in rendered.splitlines()) + "\n", encoding="utf-8"
+    )
     print("Initial PostgreSQL schema exported. No connection or migration executed.")
