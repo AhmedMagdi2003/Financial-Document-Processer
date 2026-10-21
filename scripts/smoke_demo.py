@@ -75,66 +75,18 @@ def run():
         (output / "financial-summary.json").write_text(
             json.dumps(summary, indent=2), encoding="utf-8"
         )
-        source = Path("tests/fixtures/project-update.txt").read_text(encoding="utf-8")
-        created = client.post("/api/v1/content", json={"source": source})
-        created.raise_for_status()
-        item = created.json()
-        endpoint = f"/api/v1/content/{item['id']}"
-        initial = client.get(endpoint).json()["revisions"][0]
-        assert (
-            client.post(
-                endpoint + "/retry", json={"revision": 1, "digest": initial["digest"]}
-            ).status_code
-            == 409
-        )
-        drafts = initial["drafts"]
-        drafts["website"] += "\n\nPrepared for the fictional project workspace."
-        saved = client.put(
-            endpoint,
-            json={
-                "revision": 1,
-                "drafts": drafts,
-                "channels": ["website", "linkedin", "newsletter"],
-            },
-        )
-        saved.raise_for_status()
-        revision = saved.json()
-        assert (
-            client.post(
-                endpoint + "/approve-and-publish", json={"revision": 1, "digest": initial["digest"]}
-            ).status_code
-            == 409
-        )
-        published = client.post(
-            endpoint + "/approve-and-publish", json={"revision": 2, "digest": revision["digest"]}
-        )
-        published.raise_for_status()
-        results = published.json()
-        assert len(results) == 3 and all(p["status"] == "published" for p in results), results
-        with httpx.Client(timeout=10) as public:
-            for publication in results:
-                page = public.get(publication["url"])
-                page.raise_for_status()
-                assert "LOCAL TEST" in page.text
-        for filename, value in [
-            ("three-channel-drafts.json", {"source": source, **revision}),
-            ("publication-log.json", results),
-        ]:
-            (output / filename).write_text(json.dumps(value, indent=2), encoding="utf-8")
         evidence = {
-            "mode": "offline fixtures + real local HTTP",
+            "mode": "financial fixture replay",
             "ai_inference": False,
             "base_url": "http://127.0.0.1:8000",
-            "content_url": f"http://127.0.0.1:8000/content/{item['id']}",
             "document_urls": [f"http://127.0.0.1:8000/documents/{d['id']}" for d in documents],
             "review_document_ids": [d["id"] for d in docs],
-            "published_urls": [p["url"] for p in results],
             "duration_seconds": round(perf_counter() - started, 3),
         }
         (output / "smoke-evidence.json").write_text(
             json.dumps(evidence, indent=2), encoding="utf-8"
         )
-    print("PASS: HTTP finance flow, stale approval rejected, three test channels published.")
+    print("PASS: independent HTTP finance upload, review, confirmation and exports.")
     print("Sample outputs saved under sample_outputs/. No live AI or cloud verification claimed.")
 
 

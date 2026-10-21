@@ -1,8 +1,9 @@
 """Check staged paths and configured secret values without printing their contents."""
 
 import subprocess
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
+from dotenv import dotenv_values
 from pydantic import SecretStr
 
 from app.config import Settings
@@ -19,10 +20,20 @@ def check():
         and not (field == "database_url" and cfg.mode == "demo")
     ]
     problems = []
+    content_config = Path("content-agent/.env")
+    if content_config.exists():
+        for key, value in dotenv_values(content_config).items():
+            if value and len(value) >= 16 and any(
+                marker in key for marker in ("SECRET", "TOKEN", "API_KEY")
+            ):
+                secrets.append(value.encode())
     for name in filter(None, names):
         path = PurePosixPath(name)
         if (
-            path.parts[0].casefold() in {"plan", "data", "uploads", ".venv", ".uv-cache"}
+            any(
+                part.casefold() in {"plan", "data", "uploads", ".venv", ".uv-cache"}
+                for part in path.parts
+            )
             or (path.name.startswith(".env") and path.name != ".env.example")
             or path.suffix in {".db", ".sqlite", ".sqlite3", ".key", ".pem"}
         ):

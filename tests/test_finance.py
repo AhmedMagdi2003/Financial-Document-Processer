@@ -168,13 +168,14 @@ def test_api_auth_and_csrf(runtime):
     result = client.post("/login", data={"token": cfg.reviewer_token.get_secret_value()})
     assert result.status_code == 200
     assert (
-        client.post(
-            "/api/v1/content", json={"source": "A fictional update with enough details."}
+        client.patch(
+            "/api/v1/categories/equipment",
+            json={"name": "Equipment", "definition": "Equipment for research", "active": True},
         ).status_code
         == 403
     )
     assert "Financial Operations" in client.get("/").text
-    for page in ["/review", "/content", "/operations", "/categories"]:
+    for page in ["/review", "/operations", "/categories"]:
         assert client.get(page).status_code == 200
 
 

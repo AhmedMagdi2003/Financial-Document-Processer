@@ -23,8 +23,6 @@
 <span>◉</span> Financial Operations</a>
 <a href="/review" {% if path.startswith('/review') or path.startswith('/documents') %}aria-current="page"{% endif %}>
 <span>▤</span> Document review</a>
-<a href="/content" {% if path.startswith('/content') %}aria-current="page"{% endif %}>
-<span>✎</span> Content Operations</a>
 <a href="/operations" {% if path == '/operations' %}aria-current="page"{% endif %}>
 <span>↗</span> Operations & activity</a>
 <a href="/categories" {% if path == '/categories' %}aria-current="page"{% endif %}>
@@ -33,7 +31,7 @@
 <div class="sidebar-foot">
 <span class="status-dot">
 </span> {{ 'Offline demo' if mode == 'demo' else 'Cloud workspace' }}
-<p>Fictional projects.<br>Test publishing destinations.</p>
+<p>Fictional projects.<br>Private document review.</p>
 <button class="quiet" id="logout">Sign out</button>
 </div>
 </aside>
@@ -45,9 +43,9 @@
 <main id="main">
 <div id="notice" role="status" aria-live="polite" hidden>
 </div>
-{% if mode == 'demo' %}<div class="demo-banner">DEMO MODE · Local data and fixture replay. No AI model is called. Publishing uses real HTTP to a local test API.</div>{% endif %}
+{% if mode == 'demo' %}<div class="demo-banner">DEMO MODE · Local data and fixture replay. No AI model is called. Only confirmed records enter financial totals.</div>{% endif %}
 {% block body %}{% endblock %}</main>
-<footer>Impact workspace <span>Review with care. Publish with approval.</span>
+<footer>Impact workspace <span>Review with care. Confirm accurate records.</span>
 </footer>
 </div>
 </body>

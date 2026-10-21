@@ -19,7 +19,7 @@ from sqlalchemy import or_, select, text
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.middleware.sessions import SessionMiddleware
 
-from app import content, financial
+from app import financial
 from app.ai import ProviderError
 from app.config import Settings
 from app.db import make_engine, query_metrics
@@ -28,26 +28,19 @@ from app.integrations import IntegrationError, Storage
 from app.models import (
     Attempt,
     Category,
-    Content,
     Delivery,
     Document,
     Event,
     Issue,
     Project,
-    Publication,
-    Revision,
     Usage,
     uid,
 )
 from app.observability import cost_summary, current_request, emit
 from app.schemas import (
-    ApprovalInput,
     CategoryInput,
     ConfirmInput,
-    ContentInput,
-    RejectionInput,
     ReviewInput,
-    RevisionInput,
 )
 
 ROOT = Path(__file__).parent
@@ -310,41 +303,6 @@ def create_app(settings=None, engine=None):
                 categories=session.scalars(select(Category)).all(),
             )
 
-    @application.get("/content", response_class=HTMLResponse)
-    def content_page(request: Request):
-        if not request.session.get("reviewer"):
-            return RedirectResponse("/login", 303)
-        with page_session(request) as session:
-            return render(
-                request,
-                "content.html",
-                items=session.scalars(select(Content).order_by(Content.created_at.desc())).all(),
-            )
-
-    @application.get("/content/{content_id}", response_class=HTMLResponse)
-    def content_detail(request: Request, content_id: str):
-        if not request.session.get("reviewer"):
-            return RedirectResponse("/login", 303)
-        with page_session(request) as session:
-            item = session.get(Content, content_id)
-            if not item:
-                raise HTTPException(404)
-            revision = session.get(Revision, content.revision_id(item.id, item.revision))
-            return render(
-                request,
-                "content_detail.html",
-                item=item,
-                revision=revision,
-                publications=session.scalars(
-                    select(Publication).where(Publication.revision_id == revision.id)
-                ).all(),
-                history=session.scalars(
-                    select(Revision)
-                    .where(Revision.content_id == content_id)
-                    .order_by(Revision.number.desc())
-                ).all(),
-            )
-
     @application.get("/operations", response_class=HTMLResponse)
     def operations(request: Request, q: str = ""):
         if not request.session.get("reviewer"):
@@ -521,58 +479,5 @@ def create_app(settings=None, engine=None):
         emit(session, "human", "edit_category", "succeeded", actor=actor, category_id=category_id)
         session.commit()
         return record(category)
-
-    @application.post("/api/v1/content")
-    def draft(body: ContentInput, session: DB, actor: Actor):
-        return record(content.generate(session, cfg, body.source, actor))
-
-    @application.get("/api/v1/content/{content_id}")
-    def content_status(content_id: str, session: DB, actor: Actor):
-        item = session.get(Content, content_id)
-        if not item:
-            raise HTTPException(404)
-        return {
-            "content": record(item),
-            "revisions": [
-                record(r)
-                for r in session.scalars(select(Revision).where(Revision.content_id == content_id))
-            ],
-            "publications": [
-                record(p)
-                for p in session.scalars(
-                    select(Publication)
-                    .join(Revision, Publication.revision_id == Revision.id)
-                    .where(Revision.content_id == content_id)
-                )
-            ],
-        }
-
-    @application.put("/api/v1/content/{content_id}")
-    def save_drafts(content_id: str, body: RevisionInput, session: DB, actor: Actor):
-        return record(
-            content.revise(session, content_id, body.revision, body.drafts, body.channels, actor)
-        )
-
-    @application.post("/api/v1/content/{content_id}/approve-and-publish")
-    def approve(content_id: str, body: ApprovalInput, session: DB, actor: Actor):
-        return [
-            record(p)
-            for p in content.approve_publish(
-                session, cfg, content_id, body.revision, body.digest, actor
-            )
-        ]
-
-    @application.post("/api/v1/content/{content_id}/retry")
-    def retry(content_id: str, body: ApprovalInput, session: DB, actor: Actor):
-        return [
-            record(p)
-            for p in content.approve_publish(
-                session, cfg, content_id, body.revision, body.digest, actor, retry=True
-            )
-        ]
-
-    @application.post("/api/v1/content/{content_id}/reject")
-    def reject_content(content_id: str, body: RejectionInput, session: DB, actor: Actor):
-        return record(content.reject(session, content_id, body.revision, body.justification, actor))
 
     return application

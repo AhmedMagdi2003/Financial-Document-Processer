@@ -27,11 +27,6 @@ action(document.querySelector('#upload-form'), async data => {
   const result = await api('/api/v1/documents', 'POST', data);
   location.href = '/documents/' + result.document.id;
 });
-action(document.querySelector('#content-form'), async data => {
-  notice('Preparing three drafts from your source facts…');
-  const result = await api('/api/v1/content', 'POST', {source: data.get('source')});
-  location.href = '/content/' + result.id;
-});
 const review = document.querySelector('#review-form');
 action(review, async data => {
   const candidate = JSON.parse(document.querySelector('#candidate-data').textContent);
@@ -53,35 +48,6 @@ document.querySelectorAll('[data-review-action]').forEach(button => button.addEv
     location.reload();
   } catch (error) { notice(error.message, true); } finally { button.disabled = false; }
 }));
-const draftForm = document.querySelector('#draft-form');
-let dirty = false;
-draftForm?.addEventListener('input', () => { dirty = true; });
-action(draftForm, async data => {
-  await api(`/api/v1/content/${draftForm.dataset.id}`, 'PUT', {revision: Number(draftForm.dataset.revision),
-    drafts: {linkedin: data.get('linkedin'), newsletter: data.get('newsletter'), website: data.get('website')},
-    channels: data.getAll('channels')});
-  location.reload();
-});
-async function publish(retry) {
-  if (dirty) { notice('Save your edits as a new revision before approving or retrying.', true); return; }
-  const buttons = draftForm.querySelectorAll('button'); buttons.forEach(b => b.disabled = true);
-  try {
-    notice('Sending the approved revision to the selected test destinations…');
-    const result = await api(`/api/v1/content/${draftForm.dataset.id}/${retry ? 'retry' : 'approve-and-publish'}`, 'POST', {
-      revision: Number(draftForm.dataset.revision), digest: draftForm.dataset.digest});
-    notice(result.map(p => `${p.channel}: ${p.status}${p.error ? ' · ' + p.error : ''}`).join('\n'), result.some(p => p.status === 'failed'));
-    // Reload shows durable per-channel results; the live status message is read first.
-    setTimeout(() => location.reload(), 1600);
-  } catch (error) { notice(error.message, true); } finally { buttons.forEach(b => b.disabled = false); }
-}
-document.querySelector('#approve-publish')?.addEventListener('click', () => publish(false));
-document.querySelector('#retry-publish')?.addEventListener('click', () => publish(true));
-const rejectForm = document.querySelector('#reject-form');
-action(rejectForm, async data => {
-  await api(`/api/v1/content/${rejectForm.dataset.id}/reject`, 'POST', {
-    revision: Number(rejectForm.dataset.revision), justification: data.get('justification')});
-  location.reload();
-});
 document.querySelectorAll('.category-form').forEach(form => action(form, async data => {
   await api(`/api/v1/categories/${form.dataset.id}`, 'PATCH', {name: data.get('name'), definition: data.get('definition'), active: data.has('active')});
   notice('Category saved. Its ID and historical records are preserved.');

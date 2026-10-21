@@ -19,7 +19,7 @@ def setup():
         "SECURE_COOKIES=false\n"
         f"REVIEWER_TOKEN={secrets.token_urlsafe(32)}\n"
         f"SESSION_SECRET={secrets.token_urlsafe(32)}\n"
-        f"PUBLISHER_SECRET={secrets.token_urlsafe(32)}\n",
+        "",
         encoding="utf-8",
     )
     cfg = Settings()

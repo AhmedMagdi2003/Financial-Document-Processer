@@ -33,6 +33,31 @@ Verified commands (Windows, Python 3.12.14):
   budget/usage tests, schema/cookie/environment isolation and no-finance-import check.
 - `content_app` starts via TestClient with no finance configuration.
 
+## Stage 2: complete cutover and isolation
+
+Duplicate content entry points removed from root finance: `app/content.py`, `app/publisher.py`,
+content templates, content tests, and content tables in root initial migration.
+Legacy revision decisions migration preserved in `supabase/legacy/`.
+Content agent received dedicated schema migrations (`content_ops`), read-only legacy
+data import tool (`scripts/import_legacy.py`), and independent smoke demo script.
+
+Verified commands (Windows, Python 3.12.14):
+- Root `uv run ruff check .`: PASS.
+- Root `uv run pytest -q`: **39 passed in 8.86s** (finance-only test suite).
+- Content `uv run ruff check .`: PASS.
+- Content `uv run pytest -q`: **23 passed in 4.19s** (includes legacy import and web tests).
+- `uv run python -m scripts.verify_content_isolation`: PASS (isolated copy executed with no finance code/dependencies).
+- Non-destructive legacy data import verified: 4 content items, 7 revisions, 9 publications,
+  44 events, and 9 test posts transferred; source databases read-only and hashes unchanged.
+- Both smoke demos verified: finance on port 8000, content on port 8001 / publisher on port 8011.
+
+Live provider, Supabase, external tracing and real platform credentials were not
+used. The local test publisher and offline model behavior are explicitly labeled.
+
+The four content specifications were found in `Plan/New folder` and read. They are
+private guidance and remain excluded from Git. Their requested future features are
+review criteria, not authorization to add functionality during this refactor.
+
 Live provider, Supabase, external tracing and real platform credentials were not
 used. The local test publisher and offline model behavior are explicitly labeled.
 

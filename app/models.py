@@ -122,40 +122,6 @@ class Usage(Base):
     details: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
-class Content(Base):
-    __tablename__ = "content_items"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    source: Mapped[str] = mapped_column(Text)
-    revision: Mapped[int] = mapped_column(Integer, default=1)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
-
-
-class Revision(Base):
-    __tablename__ = "content_revisions"
-    id: Mapped[str] = mapped_column(String(80), primary_key=True)
-    content_id: Mapped[str] = mapped_column(ForeignKey("content_items.id"), index=True)
-    number: Mapped[int] = mapped_column(Integer)
-    drafts: Mapped[dict] = mapped_column(JSON)
-    digest: Mapped[str] = mapped_column(String(64))
-    channels: Mapped[list] = mapped_column(JSON)
-    decision: Mapped[str] = mapped_column(String(20), default="draft", server_default="draft")
-    decision_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    approved_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-
-class Publication(Base):
-    __tablename__ = "publications"
-    id: Mapped[str] = mapped_column(String(150), primary_key=True)
-    revision_id: Mapped[str] = mapped_column(ForeignKey("content_revisions.id"), index=True)
-    channel: Mapped[str] = mapped_column(String(40))
-    status: Mapped[str] = mapped_column(String(30), default="pending")
-    attempts: Mapped[int] = mapped_column(Integer, default=0)
-    url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    error: Mapped[str | None] = mapped_column(String(120), nullable=True)
-
-
 class Delivery(Base):
     __tablename__ = "integration_deliveries"
     id: Mapped[str] = mapped_column(String(80), primary_key=True)

@@ -1,1 +1,1 @@
-"""Impact workspace: finance and content operations."""
+"""Independent Financial Document Assistant."""

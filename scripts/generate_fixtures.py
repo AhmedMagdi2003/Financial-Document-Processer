@@ -188,13 +188,6 @@ def generate():
         }
     )
     (ROOT / "ground_truth.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    (ROOT / "project-update.txt").write_text(
-        "The fictional River Research team completed a workshop on water sampling. "
-        "Participants reviewed the field protocol and agreed to test a revised checklist. "
-        "The next step is to collect feedback on the checklist. No research results "
-        "or participant counts have been reported.",
-        encoding="utf-8",
-    )
     print(f"Generated {len(manifest)} fictional documents and labeled ground truth.")
 
 

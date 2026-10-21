@@ -32,8 +32,6 @@ class Settings(BaseSettings):
     pricing_source_url: str = ""
     pricing_checked_at: str = ""
     max_input_tokens: int = 32000
-    publisher_url: str = "http://127.0.0.1:8011"
-    publisher_secret: SecretStr = SecretStr("")
     sheets_spreadsheet_id: str = ""
     sheets_access_token: SecretStr = SecretStr("")
     tracing_backends: Literal["none", "langfuse", "langsmith", "both"] = "none"

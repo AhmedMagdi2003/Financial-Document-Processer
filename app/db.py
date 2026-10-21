@@ -1,7 +1,7 @@
 from contextvars import ContextVar
 from time import perf_counter
 
-from sqlalchemy import create_engine, event, inspect, text
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 from app.models import Base, Category, Project
@@ -48,25 +48,6 @@ def make_engine(url):
 def initialize(engine):
     """Explicit setup command, not a side effect of importing or serving the app."""
     Base.metadata.create_all(engine)
-    # Additive, repeatable migration from the first prototype schema. Existing
-    # records and published pages are preserved; no database reset is performed.
-    columns = {column["name"] for column in inspect(engine).get_columns("content_revisions")}
-    if "decision" not in columns:
-        with engine.begin() as connection:
-            connection.execute(
-                text(
-                    "ALTER TABLE content_revisions ADD COLUMN decision "
-                    "VARCHAR(20) NOT NULL DEFAULT 'draft'"
-                )
-            )
-            connection.execute(
-                text("ALTER TABLE content_revisions ADD COLUMN decision_reason TEXT")
-            )
-            connection.execute(
-                text(
-                    "UPDATE content_revisions SET decision='approved' WHERE approved_at IS NOT NULL"
-                )
-            )
     with sessionmaker(engine)() as session, session.begin():
         for key, (name, definition) in CATEGORIES.items():
             if not session.get(Category, key):

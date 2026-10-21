@@ -1,8 +1,7 @@
 {
-  "mode": "offline fixtures + real local HTTP",
+  "mode": "financial fixture replay",
   "ai_inference": false,
   "base_url": "http://127.0.0.1:8000",
-  "content_url": "http://127.0.0.1:8000/content/5d78aadf-e3f4-4a76-a0c4-03327937c90e",
   "document_urls": [
     "http://127.0.0.1:8000/documents/3b923943-3bb6-40ca-8280-aa419cc3fa1e",
     "http://127.0.0.1:8000/documents/c559ad91-bcf6-481a-b875-7ddff1888999",
@@ -11,10 +10,5 @@
   "review_document_ids": [
     "fdbf0298-477b-4922-a243-0e023671cc1d"
   ],
-  "published_urls": [
-    "http://127.0.0.1:8011/posts/5d78aadf-e3f4-4a76-a0c4-03327937c90e:2:linkedin",
-    "http://127.0.0.1:8011/posts/5d78aadf-e3f4-4a76-a0c4-03327937c90e:2:newsletter",
-    "http://127.0.0.1:8011/posts/5d78aadf-e3f4-4a76-a0c4-03327937c90e:2:website"
-  ],
-  "duration_seconds": 0.774
+  "duration_seconds": 0.39
 }

@@ -9,7 +9,6 @@ from pydantic import SecretStr
 from sqlalchemy import select
 
 from app import financial
-from app.content import check_grounding
 from app.financial import Conflict
 from app.inspection import FileRejected, inspect
 from app.models import Category, Event, Usage
@@ -156,29 +155,8 @@ def test_partial_cost_is_not_presented_as_complete():
     }
 
 
-@pytest.mark.parametrize(
-    "draft",
-    [
-        "We achieved 92% accuracy.",
-        "https://madeup.test",
-        'A researcher said "An invented quotation".',
-    ],
-)
-def test_grounding_rejects_unsourced_numbers_quotes_links(draft):
-    with pytest.raises(Conflict):
-        check_grounding("The fictional team reviewed a checklist.", {"website": draft})
-
-
-def test_stale_content_edit_and_detail_pages(runtime):
+def test_financial_detail_page(runtime):
     cfg, _, client = runtime
-    item = client.post(
-        "/api/v1/content", json={"source": "The fictional team reviewed a checklist."}
-    ).json()
-    revision = client.get(f"/api/v1/content/{item['id']}").json()["revisions"][0]
-    payload = {"revision": 1, "drafts": revision["drafts"], "channels": ["website"]}
-    assert client.put(f"/api/v1/content/{item['id']}", json=payload).status_code == 200
-    assert client.put(f"/api/v1/content/{item['id']}", json=payload).status_code == 409
     client.post("/login", data={"token": cfg.reviewer_token.get_secret_value()})
-    assert "Revision 2" in client.get(f"/content/{item['id']}").text
     doc = upload_fixture(client).json()["document"]
     assert "Original document" in client.get(f"/documents/{doc['id']}").text

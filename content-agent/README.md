@@ -56,6 +56,27 @@ SQLite demo data lives in `content-agent/data/content.db`; the mock publisher ha
 its own `content-agent/data/publisher.db`. These runtime files and secrets are ignored.
 Cloud setup and PostgreSQL concurrency need credentials and are not claimed live.
 
+## Preserve an existing combined-app local database
+
+Stop the old combined app and publisher first. Run the new content demo setup,
+then from `content-agent/`:
+
+```powershell
+uv run python -m scripts.import_legacy --source-sqlite ../data/workspace.db --publisher-sqlite ../data/publisher.db
+```
+
+The transfer opens the sources read-only. It preserves IDs, source text, drafts,
+revision hashes, approvals/rejections, publications, content-specific audit events,
+draft usage and test posts. It refuses conflicting destination records and is
+idempotent when records match. Original finance records and legacy content tables
+remain untouched. New content writes use only the independent database. The same
+publisher port 8011 keeps historical local publication links usable after transfer.
+This command migrates existing local SQLite data; a live Supabase data transfer
+has not been tested. A separate Supabase schema is created by normal setup.
+
+After both content servers are running, `uv run python -m scripts.smoke_demo`
+executes the existing smoke sequence against port 8001 and saves actual outputs.
+
 ## Preserved model, publishing and telemetry behavior
 
 The existing LangChain adapters for Gemini/OpenAI/xAI, versioned prompt, bounded

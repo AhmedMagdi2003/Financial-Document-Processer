@@ -1,7 +1,7 @@
 [project]
 name = "impact-workspace"
 version = "0.1.0"
-description = "Financial review and human-approved test publishing workspace"
+description = "Independent financial document review and expense tracking workspace"
 requires-python = ">=3.12,<3.14"
 dependencies = [
   "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "jinja2>=3.1,<4",

@@ -16,19 +16,6 @@ CREATE TABLE categories (
 ALTER TABLE "categories" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE TABLE content_items (
-	id VARCHAR(36) NOT NULL,
-	source TEXT NOT NULL,
-	revision INTEGER NOT NULL,
-	created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	PRIMARY KEY (id)
-)
-
-;
-
-ALTER TABLE "content_items" ENABLE ROW LEVEL SECURITY;
-
-
 CREATE TABLE events (
 	id VARCHAR(36) NOT NULL,
 	timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -85,28 +72,6 @@ CREATE TABLE projects (
 ;
 
 ALTER TABLE "projects" ENABLE ROW LEVEL SECURITY;
-
-
-CREATE TABLE content_revisions (
-	id VARCHAR(80) NOT NULL,
-	content_id VARCHAR(36) NOT NULL,
-	number INTEGER NOT NULL,
-	drafts JSON NOT NULL,
-	digest VARCHAR(64) NOT NULL,
-	channels JSON NOT NULL,
-	decision VARCHAR(20) DEFAULT 'draft' NOT NULL,
-	decision_reason TEXT,
-	approved_by VARCHAR(100),
-	approved_at TIMESTAMP WITH TIME ZONE,
-	PRIMARY KEY (id),
-	FOREIGN KEY(content_id) REFERENCES content_items (id)
-)
-
-;
-
-CREATE INDEX ix_content_revisions_content_id ON content_revisions (content_id);
-
-ALTER TABLE "content_revisions" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE TABLE documents (
@@ -203,26 +168,6 @@ CREATE TABLE idempotency_keys (
 ;
 
 ALTER TABLE "idempotency_keys" ENABLE ROW LEVEL SECURITY;
-
-
-CREATE TABLE publications (
-	id VARCHAR(150) NOT NULL,
-	revision_id VARCHAR(80) NOT NULL,
-	channel VARCHAR(40) NOT NULL,
-	status VARCHAR(30) NOT NULL,
-	attempts INTEGER NOT NULL,
-	url TEXT,
-	published_at TIMESTAMP WITH TIME ZONE,
-	error VARCHAR(120),
-	PRIMARY KEY (id),
-	FOREIGN KEY(revision_id) REFERENCES content_revisions (id)
-)
-
-;
-
-CREATE INDEX ix_publications_revision_id ON publications (revision_id);
-
-ALTER TABLE "publications" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE TABLE validation_issues (
