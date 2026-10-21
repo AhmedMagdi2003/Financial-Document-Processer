@@ -1,0 +1,32 @@
+[
+  {
+    "id": "c3aadf2f-07e3-4abb-b72e-a94abffa7ce0:2:linkedin",
+    "revision_id": "c3aadf2f-07e3-4abb-b72e-a94abffa7ce0:2",
+    "channel": "linkedin",
+    "status": "published",
+    "attempts": 1,
+    "url": "http://127.0.0.1:8011/posts/c3aadf2f-07e3-4abb-b72e-a94abffa7ce0:2:linkedin",
+    "published_at": "2026-10-21T19:27:26.101540+00:00",
+    "error": null
+  },
+  {
+    "id": "c3aadf2f-07e3-4abb-b72e-a94abffa7ce0:2:newsletter",
+    "revision_id": "c3aadf2f-07e3-4abb-b72e-a94abffa7ce0:2",
+    "channel": "newsletter",
+    "status": "published",
+    "attempts": 1,
+    "url": "http://127.0.0.1:8011/posts/c3aadf2f-07e3-4abb-b72e-a94abffa7ce0:2:newsletter",
+    "published_at": "2026-10-21T19:27:26.128008+00:00",
+    "error": null
+  },
+  {
+    "id": "c3aadf2f-07e3-4abb-b72e-a94abffa7ce0:2:website",
+    "revision_id": "c3aadf2f-07e3-4abb-b72e-a94abffa7ce0:2",
+    "channel": "website",
+    "status": "published",
+    "attempts": 1,
+    "url": "http://127.0.0.1:8011/posts/c3aadf2f-07e3-4abb-b72e-a94abffa7ce0:2:website",
+    "published_at": "2026-10-21T19:27:26.173806+00:00",
+    "error": null
+  }
+]

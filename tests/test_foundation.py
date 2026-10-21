@@ -11,7 +11,7 @@ from app.models import Category
 
 
 def test_health():
-    with TestClient(create_app()) as client:
+    with TestClient(create_app(Settings(_env_file=None))) as client:
         assert client.get("/health").json()["status"] == "ok"
 
 

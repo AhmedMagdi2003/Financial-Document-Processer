@@ -1,0 +1,19 @@
+{% extends 'base.html' %}{% block title %}Categories{% endblock %}{% block body %}<div class="page-heading">
+<div>
+<p class="eyebrow">EXPENSE TAXONOMY</p>
+<h1>Categories with a clear purpose.</h1>
+<p>Edit definitions without changing the IDs used by historical records.</p>
+</div>
+</div>
+<div class="grid equal">{% for c in categories %}<section class="panel">
+<form class="category-form" data-id="{{ c.id }}">
+<label>Name<input name="name" value="{{ c.name }}" required>
+</label>
+<label>Definition<textarea name="definition" rows="3" minlength="10" required>{{ c.definition }}</textarea>
+</label>
+<label class="check">
+<input type="checkbox" name="active" {{ 'checked' if c.active }}> Active for new records</label>
+<p class="muted">Stable ID: {{ c.id }}</p>
+<button class="secondary">Save category</button>
+</form>
+</section>{% endfor %}</div>{% endblock %}

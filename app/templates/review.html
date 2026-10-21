@@ -1,0 +1,39 @@
+{% extends 'base.html' %}{% block title %}Document review{% endblock %}{% block crumb %}Document review{% endblock %}{% block body %}<div class="page-heading">
+<div>
+<p class="eyebrow">HUMAN REVIEW</p>
+<h1>The details deserve a second look.</h1>
+<p>Resolve concerns before adding expenses to the tracker.</p>
+</div>
+<a class="button secondary" href="/">Upload document</a>
+</div>
+<section class="panel">
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Project</th>
+<th>Status</th>
+<th>Uploaded</th>
+<th>
+</th>
+</tr>
+</thead>
+<tbody>{% for d in documents %}<tr>
+<td>
+<strong>{{ d.filename }}</strong>
+<small class="cell-note">{{ d.candidate.vendor if d.candidate else 'Extraction pending or failed' }}</small>
+</td>
+<td>{{ d.project_id }}</td>
+<td>
+<span class="tag {{ 'warning' if d.state == 'NEEDS_REVIEW' else '' }}">{{ d.state|replace('_',' ') }}</span>{% if d.error_code %}<small class="cell-note">{{ d.error_code }}</small>{% endif %}</td>
+<td>{{ d.created_at.strftime('%d %b %Y') }}</td>
+<td>
+<a href="/documents/{{ d.id }}">Review →</a>
+</td>
+</tr>{% else %}<tr>
+<td colspan="5" class="empty">You’re up to date. New documents will appear here.</td>
+</tr>{% endfor %}</tbody>
+</table>
+</div>
+</section>{% endblock %}

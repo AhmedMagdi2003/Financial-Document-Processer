@@ -1,0 +1,20 @@
+{
+  "mode": "offline fixtures + real local HTTP",
+  "ai_inference": false,
+  "base_url": "http://127.0.0.1:8000",
+  "content_url": "http://127.0.0.1:8000/content/c3aadf2f-07e3-4abb-b72e-a94abffa7ce0",
+  "document_urls": [
+    "http://127.0.0.1:8000/documents/3b923943-3bb6-40ca-8280-aa419cc3fa1e",
+    "http://127.0.0.1:8000/documents/c559ad91-bcf6-481a-b875-7ddff1888999",
+    "http://127.0.0.1:8000/documents/7a0057ad-7fe3-411f-bc05-fc62243b8aa5"
+  ],
+  "review_document_ids": [
+    "fdbf0298-477b-4922-a243-0e023671cc1d"
+  ],
+  "published_urls": [
+    "http://127.0.0.1:8011/posts/c3aadf2f-07e3-4abb-b72e-a94abffa7ce0:2:linkedin",
+    "http://127.0.0.1:8011/posts/c3aadf2f-07e3-4abb-b72e-a94abffa7ce0:2:newsletter",
+    "http://127.0.0.1:8011/posts/c3aadf2f-07e3-4abb-b72e-a94abffa7ce0:2:website"
+  ],
+  "duration_seconds": 1.207
+}

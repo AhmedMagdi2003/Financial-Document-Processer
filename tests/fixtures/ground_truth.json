@@ -1,0 +1,309 @@
+[
+  {
+    "file": "digital.pdf",
+    "sha256": "9c987fcf66212b0f17253dbeb0c22276d850bdf125137863bc5a65e6e105f1d8",
+    "route": "text",
+    "candidate": {
+      "document_type": "invoice",
+      "vendor": "Fictional Meadow Tools",
+      "date": "2026-10-12",
+      "document_number": "DEMO-001",
+      "description": "Field sampling equipment",
+      "subtotal": "100.00",
+      "tax": "20.00",
+      "grand_total": "120.00",
+      "currency": "EUR",
+      "tax_mode": "exclusive",
+      "category_id": "equipment",
+      "items": [
+        {
+          "description": "Sampling kit",
+          "quantity": "1",
+          "unit_price": "100.00",
+          "line_amount": "100.00"
+        }
+      ],
+      "evidence": [
+        "Page 1: Grand total EUR 120.00"
+      ]
+    }
+  },
+  {
+    "file": "missing-total.pdf",
+    "sha256": "889a62245dfe0e65048e0f264120b1239a11c3767b80d14309674e93a8a68979",
+    "route": "text",
+    "candidate": {
+      "document_type": "invoice",
+      "vendor": "Fictional Meadow Tools",
+      "date": "2026-10-12",
+      "document_number": "DEMO-002",
+      "description": "Field sampling equipment",
+      "subtotal": "100.00",
+      "tax": "20.00",
+      "grand_total": null,
+      "currency": "EUR",
+      "tax_mode": "exclusive",
+      "category_id": "equipment",
+      "items": [
+        {
+          "description": "Sampling kit",
+          "quantity": "1",
+          "unit_price": "100.00",
+          "line_amount": "100.00"
+        }
+      ],
+      "evidence": []
+    }
+  },
+  {
+    "file": "missing-currency.pdf",
+    "sha256": "80a8fe0ae0544b59dd636415bce9879b17ecc6b513c29e5e4ea96a346501fa68",
+    "route": "text",
+    "candidate": {
+      "document_type": "invoice",
+      "vendor": "Fictional Meadow Tools",
+      "date": "2026-10-12",
+      "document_number": "DEMO-003",
+      "description": "Field sampling equipment",
+      "subtotal": "100.00",
+      "tax": "20.00",
+      "grand_total": "120.00",
+      "currency": null,
+      "tax_mode": "exclusive",
+      "category_id": "equipment",
+      "items": [
+        {
+          "description": "Sampling kit",
+          "quantity": "1",
+          "unit_price": "100.00",
+          "line_amount": "100.00"
+        }
+      ],
+      "evidence": []
+    }
+  },
+  {
+    "file": "tax-inclusive.pdf",
+    "sha256": "577440842d08f07837d408a0956b94fd493cd8a3220603c8e46cb3f2c397ec55",
+    "route": "text",
+    "candidate": {
+      "document_type": "invoice",
+      "vendor": "Fictional Meadow Tools",
+      "date": "2026-10-12",
+      "document_number": "DEMO-004",
+      "description": "Field sampling equipment",
+      "subtotal": "120.00",
+      "tax": "20.00",
+      "grand_total": "120.00",
+      "currency": "EUR",
+      "tax_mode": "inclusive",
+      "category_id": "equipment",
+      "items": [
+        {
+          "description": "Sampling kit",
+          "quantity": "1",
+          "unit_price": "100.00",
+          "line_amount": "100.00"
+        }
+      ],
+      "evidence": [
+        "Page 1: Grand total EUR 120.00"
+      ]
+    }
+  },
+  {
+    "file": "discount.pdf",
+    "sha256": "6c7a852a5aa9a320eec2218d070d8ac1e98a1f2dd4ab4463074c7b15c30794ed",
+    "route": "text",
+    "candidate": {
+      "document_type": "invoice",
+      "vendor": "Fictional Meadow Tools",
+      "date": "2026-10-12",
+      "document_number": "DEMO-005",
+      "description": "Field sampling equipment",
+      "subtotal": "100.00",
+      "tax": "20.00",
+      "grand_total": "110.00",
+      "currency": "EUR",
+      "tax_mode": "exclusive",
+      "category_id": "equipment",
+      "items": [
+        {
+          "description": "Sampling kit",
+          "quantity": "1",
+          "unit_price": "100.00",
+          "line_amount": "100.00"
+        }
+      ],
+      "evidence": [
+        "Page 1: Discount 10.00 applied; Grand total EUR 110.00"
+      ],
+      "discount": "10.00",
+      "discount_explicit": true
+    }
+  },
+  {
+    "file": "arithmetic-conflict.pdf",
+    "sha256": "663c0c5ddace060349230e92de5e245f4ee7fe131164708f568782ef7faf7254",
+    "route": "text",
+    "candidate": {
+      "document_type": "invoice",
+      "vendor": "Fictional Meadow Tools",
+      "date": "2026-10-12",
+      "document_number": "DEMO-006",
+      "description": "Field sampling equipment",
+      "subtotal": "100.00",
+      "tax": "20.00",
+      "grand_total": "160.00",
+      "currency": "EUR",
+      "tax_mode": "exclusive",
+      "category_id": "equipment",
+      "items": [
+        {
+          "description": "Sampling kit",
+          "quantity": "1",
+          "unit_price": "100.00",
+          "line_amount": "100.00"
+        }
+      ],
+      "evidence": [
+        "Page 1: Grand total EUR 160.00"
+      ]
+    }
+  },
+  {
+    "file": "legitimate-purchase.pdf",
+    "sha256": "ba1ca97c13a87b159ff0d4e483f924af8b28512144cbec484be9481919fb8382",
+    "route": "text",
+    "candidate": {
+      "document_type": "invoice",
+      "vendor": "Fictional Meadow Tools",
+      "date": "2026-10-12",
+      "document_number": "DEMO-007",
+      "description": "Measuring tape",
+      "subtotal": "100.00",
+      "tax": "20.00",
+      "grand_total": "120.00",
+      "currency": "EUR",
+      "tax_mode": "exclusive",
+      "category_id": "equipment",
+      "items": [
+        {
+          "description": "Measuring tape"
+        }
+      ],
+      "evidence": [
+        "Page 1: Grand total EUR 120.00"
+      ]
+    }
+  },
+  {
+    "file": "business-duplicate.pdf",
+    "sha256": "4d87bdd05e3ad57ad6c0afb69f1b2ef4ea9f99c7b7c626815868f4a2f2205cef",
+    "route": "text",
+    "candidate": {
+      "document_type": "invoice",
+      "vendor": "Fictional Meadow Tools",
+      "date": "2026-10-12",
+      "document_number": "DEMO-001",
+      "description": "Field sampling equipment (copy)",
+      "subtotal": "100.00",
+      "tax": "20.00",
+      "grand_total": "120.00",
+      "currency": "EUR",
+      "tax_mode": "exclusive",
+      "category_id": "equipment",
+      "items": [
+        {
+          "description": "Sampling kit",
+          "quantity": "1",
+          "unit_price": "100.00",
+          "line_amount": "100.00"
+        }
+      ],
+      "evidence": [
+        "Page 1: Grand total EUR 120.00"
+      ]
+    }
+  },
+  {
+    "file": "scanned.pdf",
+    "sha256": "4511f423a0b1a7aee8a71efc47108e24a5e1c24c966a7e6ed8606b71f59c4fc7",
+    "route": "vision",
+    "candidate": {
+      "document_type": "invoice",
+      "vendor": "Fictional Meadow Tools",
+      "date": "2026-10-12",
+      "document_number": "DEMO-008",
+      "description": "Field sampling equipment",
+      "subtotal": "100.00",
+      "tax": "20.00",
+      "grand_total": "120.00",
+      "currency": "USD",
+      "tax_mode": "exclusive",
+      "category_id": "equipment",
+      "items": [
+        {
+          "description": "Sampling kit",
+          "quantity": "1",
+          "unit_price": "100.00",
+          "line_amount": "100.00"
+        }
+      ],
+      "evidence": [
+        "Page 1: Grand total USD 120.00"
+      ]
+    }
+  },
+  {
+    "file": "mixed.pdf",
+    "sha256": "38a376903a862efe0dfa3887594aafa88f2d92b07788472be0172ba84e4035f2",
+    "route": "mixed/fallback",
+    "candidate": {
+      "document_type": "invoice",
+      "vendor": "Fictional Meadow Tools",
+      "date": "2026-10-12",
+      "document_number": "DEMO-009",
+      "description": "Field sampling equipment",
+      "subtotal": "100.00",
+      "tax": "20.00",
+      "grand_total": "120.00",
+      "currency": "EUR",
+      "tax_mode": "exclusive",
+      "category_id": "equipment",
+      "items": [
+        {
+          "description": "Sampling kit",
+          "quantity": "1",
+          "unit_price": "100.00",
+          "line_amount": "100.00"
+        }
+      ],
+      "evidence": [
+        "Page 1: Grand total EUR 120.00"
+      ]
+    }
+  },
+  {
+    "file": "receipt.png",
+    "sha256": "bdf8b500a12ce75755a06189a7421f490d2266e9e87e0c5ebfdbc90035839d2d",
+    "route": "vision",
+    "candidate": {
+      "document_type": "receipt",
+      "vendor": "Fictional North Rail",
+      "date": "2026-10-12",
+      "document_number": null,
+      "description": "Workshop train travel",
+      "subtotal": null,
+      "tax": null,
+      "grand_total": "45.50",
+      "currency": "USD",
+      "tax_mode": "unknown",
+      "category_id": "travel",
+      "items": [],
+      "evidence": [
+        "Receipt: USD 45.50"
+      ]
+    }
+  }
+]

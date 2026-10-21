@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="csrf-token" content="{{ csrf }}">
+<title>{% block title %}Workspace{% endblock %} · Impact workspace</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/app.js" defer>
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<aside class="sidebar">
+<a class="brand" href="/">
+<span class="brand-mark">ic</span>
+<span>Impact<span class="brand-light">workspace</span>
+</span>
+</a>
+<p class="nav-label">YOUR WORKSPACE</p>
+<nav aria-label="Main navigation">
+<a href="/" {% if path == '/' %}aria-current="page"{% endif %}>
+<span>◉</span> Financial Operations</a>
+<a href="/review" {% if path.startswith('/review') or path.startswith('/documents') %}aria-current="page"{% endif %}>
+<span>▤</span> Document review</a>
+<a href="/content" {% if path.startswith('/content') %}aria-current="page"{% endif %}>
+<span>✎</span> Content Operations</a>
+<a href="/operations" {% if path == '/operations' %}aria-current="page"{% endif %}>
+<span>↗</span> Operations & activity</a>
+<a href="/categories" {% if path == '/categories' %}aria-current="page"{% endif %}>
+<span>▦</span> Expense categories</a>
+</nav>
+<div class="sidebar-foot">
+<span class="status-dot">
+</span> {{ 'Offline demo' if mode == 'demo' else 'Cloud workspace' }}
+<p>Fictional projects.<br>Test publishing destinations.</p>
+<button class="quiet" id="logout">Sign out</button>
+</div>
+</aside>
+<div class="workspace">
+<header class="topbar">
+<span>Internal workspace <span class="slash">/</span> {% block crumb %}Overview{% endblock %}</span>
+<span class="avatar" title="Internal reviewer">IR</span>
+</header>
+<main id="main">
+<div id="notice" role="status" aria-live="polite" hidden>
+</div>
+{% if mode == 'demo' %}<div class="demo-banner">DEMO MODE · Local data and fixture replay. No AI model is called. Publishing uses real HTTP to a local test API.</div>{% endif %}
+{% block body %}{% endblock %}</main>
+<footer>Impact workspace <span>Review with care. Publish with approval.</span>
+</footer>
+</div>
+</body>
+</html>

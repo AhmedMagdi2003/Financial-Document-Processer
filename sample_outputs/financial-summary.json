@@ -1,0 +1,31 @@
+{
+  "totals": {
+    "EUR": "240.0000",
+    "USD": "45.5000"
+  },
+  "categories": [
+    {
+      "currency": "EUR",
+      "category": "equipment",
+      "total": "240.0000"
+    },
+    {
+      "currency": "USD",
+      "category": "travel",
+      "total": "45.5000"
+    }
+  ],
+  "timeline": [
+    {
+      "currency": "EUR",
+      "month": "2026-10",
+      "total": "240.0000"
+    },
+    {
+      "currency": "USD",
+      "month": "2026-10",
+      "total": "45.5000"
+    }
+  ],
+  "count": 3
+}

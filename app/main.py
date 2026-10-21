@@ -1,14 +1,5 @@
-from fastapi import FastAPI
+"""FastAPI entry point; routes delegate to shared Python workflows."""
 
-
-def create_app():
-    application = FastAPI(title="Impact workspace", version="0.1.0")
-
-    @application.get("/health")
-    def health():
-        return {"status": "ok", "service": "impact-workspace"}
-
-    return application
-
+from app.web import create_app
 
 app = create_app()

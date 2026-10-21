@@ -1,0 +1,45 @@
+<div class="metrics">
+  <div class="metric">
+<span>Document throughput</span>
+<strong>{{ stats.completed }}</strong>
+<small>{{ stats.documents }} received · current workspace</small>
+</div>
+  <div class="metric">
+<span>Extraction success</span>
+<strong>{{ (stats.success_rate|string ~ '%') if stats.success_rate is not none else '—' }}</strong>
+<small>{{ stats.failed }} failed documents</small>
+</div>
+  <div class="metric">
+<span>Currently awaiting review</span>
+<strong>{{ (stats.review_rate|string ~ '%') if stats.review_rate is not none else '—' }}</strong>
+<small>{{ stats.review }} review documents / {{ stats.completed }} completed</small>
+</div>
+</div>
+{% if costs %}
+<section class="panel">
+<h2>Cost by provider, operation and run</h2>
+<p class="muted">Known estimates are partial when unknown calls exist. Estimates are not provider invoices.</p>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>ID</th>
+<th>Calls</th>
+<th>Known estimated USD</th>
+<th>Unknown cost calls</th>
+</tr>
+</thead>
+<tbody>
+{% for c in costs %}<tr>
+<td>{{ c.dimension }}</td>
+<td>{{ c.key }}</td>
+<td>{{ c.calls }}</td>
+<td>{{ c.known_estimate_usd }}</td>
+<td>{{ c.unknown_calls }}</td>
+</tr>{% endfor %}
+</tbody>
+</table>
+</div>
+</section>
+{% endif %}

@@ -1,0 +1,138 @@
+{% extends 'base.html' %}{% block title %}Financial Operations{% endblock %}{% block body %}
+<div class="page-heading">
+<div>
+<p class="eyebrow">FINANCIAL OPERATIONS</p>
+<h1>A clear view of every expense.</h1>
+<p>Review the details. Keep project spending in perspective.</p>
+</div>
+<a class="button secondary" href="/api/v1/expenses.csv?project={{ filters.project|urlencode }}&category={{ filters.category|urlencode }}&currency={{ filters.currency|urlencode }}">↓ Export tracker</a>
+</div>
+<section class="metrics" aria-label="Financial summary">
+{% for currency, amount in summary.totals.items() %}<div class="metric">
+<span>Confirmed spend · {{ currency }}</span>
+<strong>{{ amount }}</strong>
+<small>Confirmed records only</small>
+</div>{% else %}<div class="metric">
+<span>Confirmed spend</span>
+<strong>—</strong>
+<small>Confirm your first document to begin</small>
+</div>{% endfor %}
+<a class="metric" href="/review">
+<span>Awaiting review</span>
+<strong>{{ documents|selectattr('state','equalto','NEEDS_REVIEW')|list|length }}</strong>
+<small>Needs a human decision ↗</small>
+</a>
+<div class="metric">
+<span>Processed documents</span>
+<strong>{{ documents|rejectattr('state','equalto','RECEIVED')|rejectattr('state','equalto','PROCESSING')|rejectattr('state','equalto','FAILED')|list|length }}</strong>
+<small>{{ duplicate_count }} open duplicate alerts</small>
+</div>
+</section>
+<div class="grid two-one">
+<section class="panel">
+<div class="panel-title">
+<h2>Upload a document</h2>
+<span class="tag">PDF · JPG · PNG · WEBP</span>
+</div>
+<p>Choose the project yourself. We’ll extract a candidate for your review.</p>
+<form id="upload-form">
+<label for="project">Project</label>
+<select id="project" name="project_id" required>{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
+<label class="dropzone" for="file">
+<span class="upload-icon">↑</span>
+<strong>Choose an invoice or receipt</strong>
+<span>Maximum 10 MB · 8 PDF pages</span>
+<input id="file" name="file" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" required>
+</label>
+<button>Upload & process →</button>
+<span class="form-note">{{ 'Fixture replay: use files from tests/fixtures' if provider == 'fixture' else 'Configured extraction provider: ' ~ provider }}</span>
+</form>
+</section>
+<section class="panel accent">
+<p class="eyebrow">RECORDS YOU CAN TRUST</p>
+<h2>Confirmation comes first.</h2>
+<p>Uploaded documents do not enter your totals until you confirm them. Missing amounts, unknown currencies, duplicates and arithmetic conflicts stay visible.</p>
+<a href="/review">Open document review →</a>
+<hr>
+<h3>Google Sheets projection</h3>
+<p>{{ deliveries|selectattr('status','equalto','succeeded')|list|length }} synced · {{ deliveries|selectattr('status','equalto','failed')|list|length }} failed · {{ deliveries|selectattr('status','equalto','pending')|list|length }} pending</p>
+<small>Unconfigured integrations stay pending. Your confirmed records remain in this workspace.</small>
+</section>
+</div>
+<section class="panel">
+<div class="panel-title">
+<div>
+<p class="eyebrow">CONFIRMED RECORDS</p>
+<h2>Expense tracker</h2>
+</div>
+<span class="tag">{{ summary.count }} records</span>
+</div>
+<form class="filters" method="get">
+<label>Project<select name="project">
+<option value="">All projects</option>{% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if filters.project == p.id }}>{{ p.name }}</option>{% endfor %}</select>
+</label>
+<label>Category<select name="category">
+<option value="">All categories</option>{% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if filters.category == c.id }}>{{ c.name }}</option>{% endfor %}</select>
+</label>
+<label>Currency<input name="currency" maxlength="3" placeholder="e.g. EUR" value="{{ filters.currency }}">
+</label>
+<label>From<input type="date" name="start" value="{{ filters.start }}">
+</label>
+<label>To<input type="date" name="end" value="{{ filters.end }}">
+</label>
+<button class="secondary">Apply</button>
+<a href="/">Reset</a>
+</form>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Vendor / description</th>
+<th>Project</th>
+<th>Category</th>
+<th>Date</th>
+<th class="number">Amount</th>
+<th>Record</th>
+</tr>
+</thead>
+<tbody>{% for e in records %}<tr>
+<td>
+<strong>{{ e.vendor or 'Vendor unknown' }}</strong>
+<small class="cell-note">{{ e.description }}</small>
+</td>
+<td>{{ e.project_id }}</td>
+<td>{{ e.category_id or 'Uncategorized' }}</td>
+<td>{{ e.date or 'Unknown' }}</td>
+<td class="number">
+<strong>{{ e.total }} {{ e.currency }}</strong>
+</td>
+<td>
+<a href="/documents/{{ e.document_id }}">View ↗</a>
+</td>
+</tr>{% else %}<tr>
+<td colspan="6" class="empty">No confirmed expenses match these filters. Upload and confirm a document to get started.</td>
+</tr>{% endfor %}</tbody>
+</table>
+</div>
+</section>
+<div class="grid equal">
+<section class="panel">
+<h2>Spend by category</h2>
+<p class="muted">Select one currency above to focus the distribution. Every currency stays separate.</p>{% for c in summary.categories %}<div class="distribution">
+<span>{{ c.category|title }} <small>{{ c.currency }}</small>
+</span>
+<strong>{{ c.total }}</strong>
+</div>
+<meter value="{{ c.total }}" max="{{ summary.totals[c.currency] }}" aria-label="{{ c.category }} {{ c.currency }}">
+</meter>{% else %}<p class="empty">Category distribution appears after confirmation.</p>{% endfor %}</section>
+<section class="panel">
+<h2>Spend over time</h2>
+<p class="muted">Document month · confirmed expenses</p>{% for t in summary.timeline %}<div class="distribution">
+<span>{{ t.month }} <small>{{ t.currency }}</small>
+</span>
+<strong>{{ t.total }}</strong>
+</div>
+<meter value="{{ t.total }}" max="{{ summary.totals[t.currency] }}" aria-label="{{ t.month }} {{ t.currency }}">
+</meter>{% else %}<p class="empty">Your monthly spending will appear here.</p>{% endfor %}</section>
+</div>
+{% endblock %}

@@ -1,0 +1,135 @@
+{
+  "sample_size": 11,
+  "live_inference": false,
+  "provider": null,
+  "model": null,
+  "routing_correct": 11,
+  "live_field_scores": {
+    "vendor": {
+      "correct": 0,
+      "assessed": 0
+    },
+    "date": {
+      "correct": 0,
+      "assessed": 0
+    },
+    "document_number": {
+      "correct": 0,
+      "assessed": 0
+    },
+    "grand_total": {
+      "correct": 0,
+      "assessed": 0
+    },
+    "currency": {
+      "correct": 0,
+      "assessed": 0
+    },
+    "tax": {
+      "correct": 0,
+      "assessed": 0
+    }
+  },
+  "limitation": "Small synthetic set. Routing is not extraction accuracy. Without --live, no model fields, token usage or cost are evaluated.",
+  "documents": [
+    {
+      "file": "digital.pdf",
+      "route": "text",
+      "route_correct": true,
+      "routing_ms": 6.312,
+      "live_candidate": null,
+      "live_error": null,
+      "elapsed_ms": 6.318
+    },
+    {
+      "file": "missing-total.pdf",
+      "route": "text",
+      "route_correct": true,
+      "routing_ms": 1.453,
+      "live_candidate": null,
+      "live_error": null,
+      "elapsed_ms": 1.457
+    },
+    {
+      "file": "missing-currency.pdf",
+      "route": "text",
+      "route_correct": true,
+      "routing_ms": 1.228,
+      "live_candidate": null,
+      "live_error": null,
+      "elapsed_ms": 1.231
+    },
+    {
+      "file": "tax-inclusive.pdf",
+      "route": "text",
+      "route_correct": true,
+      "routing_ms": 1.535,
+      "live_candidate": null,
+      "live_error": null,
+      "elapsed_ms": 1.539
+    },
+    {
+      "file": "discount.pdf",
+      "route": "text",
+      "route_correct": true,
+      "routing_ms": 1.426,
+      "live_candidate": null,
+      "live_error": null,
+      "elapsed_ms": 1.429
+    },
+    {
+      "file": "arithmetic-conflict.pdf",
+      "route": "text",
+      "route_correct": true,
+      "routing_ms": 1.162,
+      "live_candidate": null,
+      "live_error": null,
+      "elapsed_ms": 1.165
+    },
+    {
+      "file": "legitimate-purchase.pdf",
+      "route": "text",
+      "route_correct": true,
+      "routing_ms": 1.16,
+      "live_candidate": null,
+      "live_error": null,
+      "elapsed_ms": 1.163
+    },
+    {
+      "file": "business-duplicate.pdf",
+      "route": "text",
+      "route_correct": true,
+      "routing_ms": 1.311,
+      "live_candidate": null,
+      "live_error": null,
+      "elapsed_ms": 1.315
+    },
+    {
+      "file": "scanned.pdf",
+      "route": "vision",
+      "route_correct": true,
+      "routing_ms": 37.249,
+      "live_candidate": null,
+      "live_error": null,
+      "elapsed_ms": 37.259
+    },
+    {
+      "file": "mixed.pdf",
+      "route": "mixed/fallback",
+      "route_correct": true,
+      "routing_ms": 62.493,
+      "live_candidate": null,
+      "live_error": null,
+      "elapsed_ms": 62.503
+    },
+    {
+      "file": "receipt.png",
+      "route": "vision",
+      "route_correct": true,
+      "routing_ms": 28.611,
+      "live_candidate": null,
+      "live_error": null,
+      "elapsed_ms": 28.623
+    }
+  ]
+}

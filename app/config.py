@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     provider_timeout: int = 45
     max_llm_calls: int = 3
     max_job_cost_usd: str = "0.10"
+    input_usd_per_million: str = ""
+    output_usd_per_million: str = ""
+    pricing_source_url: str = ""
+    pricing_checked_at: str = ""
+    max_input_tokens: int = 32000
     publisher_url: str = "http://127.0.0.1:8011"
     publisher_secret: SecretStr = SecretStr("")
     sheets_spreadsheet_id: str = ""
