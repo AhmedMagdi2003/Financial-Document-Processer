@@ -1,21 +1,14 @@
-# Financial Document Assistant and Content Agent
+# Financial Document Assistant
 
-Two independent Python applications share this repository. The Financial Document
-Assistant remains at the repository root. The existing content/publishing workflow
-has moved to [content-agent/](content-agent/README.md), with its own dependencies,
-settings, database, tests and startup commands. Neither app imports the other.
+Independent financial document review and expense tracking workspace. The AI Content
+Generation & Publishing Agent is maintained in its own dedicated repository (`Content-Agent`).
+Neither application imports or depends on the other.
 
 ```text
-app/                      # Financial Document Assistant (unchanged location)
+app/                      # Financial Document Assistant
 scripts/, tests/          # Finance setup, demo, evaluation and tests
-pyproject.toml, uv.lock    # Finance environment
-supabase/migrations/      # Finance-only fresh schema
-content-agent/
-  content_app/            # Extracted existing Content Agent and test publisher
-  scripts/, tests/        # Independent setup, read-only legacy import and tests
-  migrations/            # Isolated content_ops PostgreSQL schema
-  pyproject.toml, uv.lock # Independent content environment
-  .env.example, README.md
+pyproject.toml, uv.lock   # Finance environment
+supabase/migrations/      # Finance-only fresh schema (public)
 ```
 
 ## Run finance independently
@@ -31,8 +24,7 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 Open [Finance](http://127.0.0.1:8000), then copy `REVIEWER_TOKEN` from the root
 `.env` into the sign-in form. Setup preserves an existing `.env` and does not print
 secrets. No content process or publisher is required. The root `.env` and `data/`
-are financial runtime configuration; Content Agent uses its own prefixed settings
-and separate files under `content-agent/`.
+are financial runtime configuration.
 
 Demo mode uses known fictional fixture replay, not live AI. Upload
 `tests/fixtures/digital.pdf`, `receipt.png`, `missing-total.pdf` or `mixed.pdf`.
@@ -51,38 +43,24 @@ when unconfigured or failed. Operations provides sanitized events and usage/cost
 
 ![Observed finance dashboard before extraction](docs/screenshots/finance-2026-10-21.png)
 
-## Run Content Agent independently
+## Decoupled Content Agent Repository
 
-```powershell
-cd content-agent
-uv sync --locked
-uv run python -m scripts.demo_setup
-uv run uvicorn content_app.main:app --host 127.0.0.1 --port 8001
-```
-
-In a second terminal inside `content-agent/`, run:
-
-```powershell
-uv run uvicorn content_app.publisher:app --host 127.0.0.1 --port 8011
-```
-
-Open [Content Agent](http://127.0.0.1:8001), using its `CONTENT_REVIEWER_TOKEN`.
-See its [README](content-agent/README.md) for editing, approval, rejection, selected
-test destinations, errors/retries, legacy data transfer and verification evidence.
+The Content Generation & Automated Publishing Agent is maintained in a separate repository:
+- Located at `D:\Content-Agent` (or its separate GitHub repository).
+- Operates its own server on port 8001 and local mock publisher on port 8011.
+- Operates its own PostgreSQL schema `content_ops` or dedicated SQLite store.
+- Neither application shares code, configuration, or runtime processes.
 
 ## Existing data and preserved history
 
 The extraction does not drop old database tables or rewrite Git history. Legacy
 content tables/events in an existing combined SQLite database remain intact; the
-independent app writes to a separate database. Its read-only import tool copies
-sources, revisions, decisions, publications, content events/usage and test posts
-while preserving IDs and URLs. Historical schema upgrade SQL from the combined app
+independent app writes to a separate database. Historical schema upgrade SQL from the combined app
 is retained in `supabase/legacy/`; it is not a finance setup migration.
 
 No database dumps, credentials, private planning Markdown/PDF, uploaded originals,
 caches or runtime logs are committed. Fictional fixture files and measured sample
-exports are included deliberately. Original combined outputs remain in Git history;
-content examples moved into `content-agent/sample_outputs/legacy/` with clear labels.
+exports are included deliberately. Original combined outputs remain in Git history.
 
 ## Finance cloud setup
 
@@ -100,7 +78,6 @@ without public policies; creates/forces a private `originals` bucket. The server
 uses a privileged DB connection; browser clients do not query Supabase directly.
 `supabase/migrations/001_initial.sql` is a fresh schema export, not an upgrade
 runner. Regenerate it with `uv run python -m scripts.export_schema`.
-The Content Agent has an independent `content_ops` schema and needs no file bucket.
 Live Supabase setup and PostgreSQL concurrency are not claimed verified.
 
 ## Finance models, rules and integrations
@@ -164,7 +141,7 @@ curl -H "Authorization: Bearer $REVIEWER_TOKEN" \
 Processing is synchronous/bounded; `GET /api/v1/documents/{id}` returns persisted
 state. Changed input with a reused idempotency key gets 409. Other endpoints:
 reviews, fields PATCH, confirm/dismiss/reextract POST, expenses/summary/CSV, category
-PATCH and Sheets sync POST. Content endpoints are now served only on port 8001.
+PATCH and Sheets sync POST.
 
 ```powershell
 uv run ruff check .
@@ -172,9 +149,8 @@ uv run pytest -q
 uv run python -m scripts.smoke_demo
 ```
 
-Content tests run separately from `content-agent/`. CI has independent jobs.
-See [extraction evidence](docs/content-extraction.md) and each app's docs for actual
-results and remaining gaps. Supabase, live models, Sheets, optional traces and a
-live AI accuracy benchmark still require verification. The <=5 minute joint video
-is not recorded; only verified operator instructions/screenshots are provided.
+Content tests run separately in the `Content-Agent` repository.
+See each app's docs for actual results and remaining gaps. Supabase, live models,
+Sheets, optional traces and a live AI accuracy benchmark still require verification.
+The <=5 minute joint video is not recorded; only verified operator instructions/screenshots are provided.
 Free-tier limits, pauses and network failures remain operational constraints.
