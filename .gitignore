@@ -1,6 +1,13 @@
 # Private assessment, implementation prompts and working guidance
 /[Pp]lan/
 /docs/private/
+/content-agent/data/
+/content-agent/tmp/
+/content-agent/recordings/
+CONTENT_MASTER_BUILD_PROMPT.md
+CONTENT_IMPLEMENTATION_PLAN.md
+CONTENT_ACCEPTANCE_MATRIX.md
+CONTENT_DEMO_VIDEO_GUIDE.md
 AGENTS.md
 IMPLEMENTATION_PLAN.md
 ACCEPTANCE_MATRIX.md
