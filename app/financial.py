@@ -125,10 +125,15 @@ def find_duplicates(session, candidate, document_id):
             other_doc = session.get(Document, other.document_id)
             other_items = (other_doc.candidate or {}).get("items", [])
             if not same_number and candidate.items and other_items:
-                left = {normalized(i.description) for i in candidate.items}
-                right = {normalized(i["description"]) for i in other_items}
-                if left.isdisjoint(right):
-                    continue
+                if (
+                    candidate.document_number
+                    and other.document_number
+                    and candidate.document_number != other.document_number
+                ):
+                    left = {normalized(i.description) for i in candidate.items}
+                    right = {normalized(i["description"]) for i in other_items}
+                    if left.isdisjoint(right):
+                        continue
             matches.append(other.document_id)
     # Also compare unconfirmed candidates: duplicate checks must not wait for the
     # first receipt to enter the expense tracker. State is indexed; the small
@@ -160,10 +165,15 @@ def find_duplicates(session, candidate, document_id):
         if not same_number and not same_purchase:
             continue
         if not same_number and candidate.items and other.items:
-            left = {normalized(item.description) for item in candidate.items}
-            right = {normalized(item.description) for item in other.items}
-            if left.isdisjoint(right):
-                continue
+            if (
+                    candidate.document_number
+                    and other.document_number
+                    and candidate.document_number != other.document_number
+                ):
+                left = {normalized(item.description) for item in candidate.items}
+                right = {normalized(item.description) for item in other.items}
+                if left.isdisjoint(right):
+                    continue
         matches.append(other_doc.id)
     return list(dict.fromkeys(matches))
 
@@ -260,7 +270,37 @@ class FinanceState(TypedDict, total=False):
     inspection: object
 
 
-def process(session, settings, document_id, actor="demo-reviewer", provider=None):
+def auto_record_document(session, settings, document, actor="auto-recorder"):
+    if document.state != "READY_TO_RECORD" or not document.candidate:
+        return None
+    candidate = Candidate.model_validate(document.candidate)
+    expense = Expense(
+        document_id=document.id,
+        project_id=document.project_id,
+        category_id=candidate.category_id,
+        vendor=candidate.vendor,
+        vendor_normalized=normalized(candidate.vendor),
+        document_number=normalized(candidate.document_number) or None,
+        date=str(candidate.date) if candidate.date else None,
+        description=candidate.description,
+        total=candidate.grand_total,
+        currency=candidate.currency,
+    )
+    session.add(expense)
+    session.flush()
+    document.state = "RECORDED"
+    document.version += 1
+    row = (session.scalar(select(func.max(Delivery.row_number))) or 1) + 1
+    session.add(Delivery(id=f"sheets:{expense.id}", expense_id=expense.id, row_number=row))
+    emit(session, "automation", "auto_record", "RECORDED", resource_id=document.id, actor=actor)
+    try:
+        sync_sheets(session, settings, expense.id)
+    except Exception:
+        pass
+    return expense
+
+
+def process(session, settings, document_id, actor="demo-reviewer", provider=None, auto_record=None):
     document = session.get(Document, document_id)
     if not document or document.state not in {
         "RECEIVED",
@@ -348,6 +388,10 @@ def process(session, settings, document_id, actor="demo-reviewer", provider=None
     except Exception as exc:
         document.state, attempt.status = "FAILED", "failed"
         document.error_code = str(exc) if isinstance(exc, ProviderError) else "PROCESSING_FAILED"
+    if auto_record is None:
+        auto_record = getattr(settings, "auto_record", False)
+    if auto_record and document.state == "READY_TO_RECORD":
+        auto_record_document(session, settings, document, actor=actor)
     emit(
         session,
         "finance",

@@ -62,13 +62,39 @@ class Sheets:
     @property
     def configured(self):
         return bool(
-            self.settings.sheets_spreadsheet_id
-            and self.settings.sheets_access_token.get_secret_value()
+            (
+                self.settings.sheets_spreadsheet_id
+                and self.settings.sheets_access_token.get_secret_value()
+            )
+            or getattr(self.settings, "sheets_webhook_url", "")
         )
 
     def sync(self, row, values):
         if not self.configured:
             raise IntegrationError("SHEETS_NOT_CONFIGURED")
+        webhook_url = getattr(self.settings, "sheets_webhook_url", "")
+        if webhook_url:
+            with httpx.Client(transport=self.transport, timeout=15) as client:
+                response = client.post(
+                    webhook_url,
+                    json={
+                        "row": row,
+                        "values": values,
+                        "expense": {
+                            "id": values[0],
+                            "project": values[1],
+                            "category": values[2],
+                            "vendor": values[3],
+                            "date": values[4],
+                            "description": values[5],
+                            "total": values[6],
+                            "currency": values[7],
+                        },
+                    },
+                )
+            if response.is_error:
+                raise IntegrationError(f"SHEETS_WEBHOOK_HTTP_{response.status_code}")
+            return
         sheet_id = quote(self.settings.sheets_spreadsheet_id, safe="")
         token = self.settings.sheets_access_token.get_secret_value()
         with httpx.Client(transport=self.transport, timeout=15) as client:

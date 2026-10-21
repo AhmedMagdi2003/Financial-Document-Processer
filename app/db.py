@@ -14,7 +14,7 @@ CATEGORIES = {
     "equipment": ("Equipment", "Physical equipment and durable hardware"),
     "software": ("Software", "Software licences and digital subscriptions"),
     "events": ("Events", "Workshops, venues and event delivery"),
-    "operational": ("Operational", "Office supplies, utilities and administration"),
+    "operational": ("Operational Expenses", "Office supplies, utilities and administration"),
 }
 
 
@@ -55,6 +55,9 @@ def initialize(engine):
         for key, name in [
             ("river", "River Research (fictional)"),
             ("skills", "Skills Lab (fictional)"),
+            ("Civic Data Lab", "Civic Data Lab"),
+            ("Mobility Mapping", "Mobility Mapping"),
+            ("Urban Climate Research", "Urban Climate Research"),
         ]:
             if not session.get(Project, key):
                 session.add(Project(id=key, name=name))

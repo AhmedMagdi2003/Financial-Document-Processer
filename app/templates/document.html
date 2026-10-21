@@ -9,10 +9,17 @@
 </div>
 <a href="/review">← Review queue</a>
 </div>
-{% if document.error_code %}<div class="issue blocking">
-<strong>Processing failed</strong>
-<p>{{ document.error_code }}. Configure the provider or use a known fixture in demo mode, then re-extract.</p>
-</div>{% endif %}
+{% if document.error_code %}
+{% set err = map_error(document.error_code) %}
+<div class="human-error-card">
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+<strong style="color:var(--red); font-size:16px;">⚠️ {{ err.title }}</strong>
+<span class="badge-status badge-failed">{{ err.category|replace('_', ' ')|upper }}</span>
+</div>
+<p style="margin:0 0 6px 0;"><strong>Why it failed:</strong> {{ err.reason }}</p>
+<p style="margin:0; color:var(--ink);"><strong>What you can do next:</strong> {{ err.action }}</p>
+</div>
+{% endif %}
 <div class="grid equal">
 <section class="panel">
 <div class="panel-title">
@@ -43,10 +50,16 @@
 {% if document.candidate and document.candidate.category_rationale %}<p class="muted">Category advice: {{ document.candidate.category_rationale }}</p>{% endif %}</section>
 </div>
 <section class="panel">
-<h2>Validation & evidence</h2>{% for issue in issues %}<article class="issue {{ issue.severity }}">
-<span class="tag">{{ issue.severity }}</span> <strong>{{ issue.code }}</strong>
-<p>{{ issue.explanation }}</p>
-<small>Field: {{ issue.field }}</small>{% if issue.evidence.document_ids %}<p>Possible matches: {% for id in issue.evidence.document_ids %}<a href="/documents/{{ id }}">View record ↗</a> {% endfor %}</p>{% endif %}{% if issue.evidence.expected %}<p>Expected {{ issue.evidence.expected }} · Reported {{ issue.evidence.actual }}</p>{% endif %}</article>{% else %}<p class="success-text">No unresolved validation concerns.</p>{% endfor %}{% if document.candidate %}{% for e in document.candidate.evidence %}<blockquote>{{ e }}</blockquote>{% endfor %}{% endif %}
+<h2>Validation & evidence</h2>{% for issue in issues %}
+{% set err = map_error(issue.code) %}
+<article class="issue {{ issue.severity }}">
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+<strong>{{ err.title }}</strong>
+<span class="tag {{ issue.severity }}">{{ issue.severity|upper }}</span>
+</div>
+<p><strong>Condition:</strong> {{ err.reason }}</p>
+<p class="muted"><strong>Action required:</strong> {{ err.action }}</p>
+<small>Field: {{ issue.field }} · System Code: {{ issue.code }}</small>{% if issue.evidence.document_ids %}<p>Possible matching records: {% for id in issue.evidence.document_ids %}<a href="/documents/{{ id }}">View record ↗</a> {% endfor %}</p>{% endif %}{% if issue.evidence.expected %}<p>Expected {{ issue.evidence.expected }} · Reported {{ issue.evidence.actual }}</p>{% endif %}</article>{% else %}<p class="success-text">No unresolved validation concerns.</p>{% endfor %}{% if document.candidate %}{% for e in document.candidate.evidence %}<blockquote>{{ e }}</blockquote>{% endfor %}{% endif %}
 {% if document.state not in ['RECORDED','DISMISSED','PROCESSING'] %}<label for="justification">Review justification (required for overrides or dismissal)</label>
 <textarea id="justification" rows="2" placeholder="Explain the decision using the original document.">
 </textarea>

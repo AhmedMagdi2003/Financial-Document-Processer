@@ -31,22 +31,58 @@
 <div class="grid two-one">
 <section class="panel">
 <div class="panel-title">
-<h2>Upload a document</h2>
-<span class="tag">PDF · JPG · PNG · WEBP</span>
+<h2>Upload documents</h2>
+<span class="tag">Single or Batch · PDF · JPG · PNG · WEBP</span>
 </div>
-<p>Choose the project yourself. We’ll extract a candidate for your review.</p>
+<p>Select a project and upload one or multiple invoices/receipts. Valid documents record automatically.</p>
 <form id="upload-form">
 <label for="project">Project</label>
 <select id="project" name="project_id" required>{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
 <label class="dropzone" for="file">
 <span class="upload-icon">↑</span>
-<strong>Choose an invoice or receipt</strong>
-<span>Maximum 10 MB · 8 PDF pages</span>
-<input id="file" name="file" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" required>
+<strong>Choose invoices or receipts (multiple supported)</strong>
+<span>Drag & drop or browse · Max 10 MB per file · Up to 8 PDF pages</span>
+<input id="file" name="file" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple required>
 </label>
-<button>Upload & process →</button>
+<div style="margin: 12px 0;">
+<label class="check">
+<input type="checkbox" id="auto_record" name="auto_record" value="true" checked>
+<strong>Automated Recording:</strong> Automatically record valid expenses and sync to Google Sheets. Pause only on critical conditions.
+</label>
+</div>
+<button id="upload-btn">Start Processing →</button>
 <span class="form-note">{{ 'Fixture replay: use files from tests/fixtures' if provider == 'fixture' else 'Configured extraction provider: ' ~ provider }}</span>
 </form>
+<div id="batch-panel" class="batch-panel" hidden>
+<div class="batch-header">
+<div>
+<h3 id="batch-title" style="margin:0;">Batch Processing Queue</h3>
+<p id="batch-subtitle" class="muted" style="margin:4px 0 0 0;">Processing documents sequentially...</p>
+</div>
+<div id="batch-actions" style="display:flex; gap:8px;" hidden>
+<a class="button secondary" href="/review" style="padding:6px 12px; font-size:13px;">Review Queue ↗</a>
+<a class="button" href="/" style="padding:6px 12px; font-size:13px;">Refresh Expenses</a>
+</div>
+</div>
+<div class="progress-bar-container">
+<div id="batch-progress" class="progress-bar-fill" style="width: 0%;"></div>
+</div>
+<div class="table-wrap">
+<table class="batch-table">
+<thead>
+<tr>
+<th>Document</th>
+<th>Status</th>
+<th>Extracted Summary</th>
+<th>Details / Issues</th>
+<th>Link</th>
+</tr>
+</thead>
+<tbody id="batch-items">
+</tbody>
+</table>
+</div>
+</div>
 </section>
 <section class="panel accent">
 <p class="eyebrow">RECORDS YOU CAN TRUST</p>

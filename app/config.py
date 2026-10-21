@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     max_input_tokens: int = 32000
     sheets_spreadsheet_id: str = ""
     sheets_access_token: SecretStr = SecretStr("")
+    sheets_webhook_url: str = ""
+    auto_record: bool = False
     tracing_backends: Literal["none", "langfuse", "langsmith", "both"] = "none"
 
     @model_validator(mode="after")

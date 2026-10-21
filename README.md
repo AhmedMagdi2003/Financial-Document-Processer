@@ -8,16 +8,19 @@ An automated financial operations assistant designed for expense tracking, recei
 
 - **Document Ingestion**: Accepts PDF, PNG, JPEG, and WEBP formats with MIME validation and page limits.
 - **Smart PDF Routing**: Inspects PDF layout with PyMuPDF; routes text-based documents directly and visual/mixed documents through multimodal processing.
-- **Deterministic Extraction**: Extracts invoice/receipt number, vendor, dates, line items, taxes, discounts, and currency into typed Pydantic models with `Decimal` precision.
-- **Multi-Layer Validation**:
-  - `MISSING_GRAND_TOTAL`: Blocks confirmation if no explicit total is detected.
-  - `MISSING_CURRENCY`: Blocks confirmation if currency is absent or ambiguous.
-  - `POSSIBLE_DUPLICATE`: Flags potential duplicate expenses by comparing SHA-256 hashes, vendor names, dates, amounts, and items.
-  - `TOTAL_INCONSISTENCY`: Flags arithmetic discrepancies between subtotal, discounts, taxes, and total.
+- **Automated Processing**: End-to-end automated pipeline (`Document received → Automatic extraction → Validation → Categorization → Duplicate detection → Automatic recording if valid → Google Sheets sync`).
+- **Deterministic Review Gates**: Zero-human-intervention for valid documents. Human intervention is strictly quarantined to 4 critical review conditions:
+  1. `MISSING_GRAND_TOTAL`: Grand total could not be determined.
+  2. `MISSING_CURRENCY`: Currency could not be determined or is ambiguous.
+  3. `POSSIBLE_DUPLICATE`: Vendor, date, amount, or hash matches an existing record.
+  4. `TOTAL_INCONSISTENCY`: Subtotal + tax - discount does not equal the grand total.
+- **Nonblocking Warnings**: Non-critical warnings (e.g., missing invoice number on a receipt, missing payment method, unlisted category) are attached to the recorded expense without blocking auto-recording.
+- **Batch Upload & Sequential Processing**: Select multiple files simultaneously; a resilient in-process queue processes documents one-by-one with real-time UI progress, status badges, and failure isolation.
+- **Human-Friendly Error Handling**: Structured error taxonomy mapping technical provider failures, unreadable files, and validation warnings into actionable guidance without leaking stack traces or credentials.
 - **Review Queue**: Dedicated interface for nontechnical operators to review, edit, revalidate, re-extract, confirm, or dismiss flagged candidates.
 - **Confirmed Expense Tracker**: Multi-currency spend summaries, date/project/category filters, and CSV export.
 - **Authoritative Persistence**: Backed by Supabase PostgreSQL with Row Level Security (RLS) enabled.
-- **Outbound Integrations**: Google Sheets sync projection with idempotent row updates.
+- **Google Sheets & Drive Integrations**: Automatic outbound sync via Google Sheets API v4 or a 100% free Google Apps Script webhook (see [Integration Guide](docs/INTEGRATION_GUIDE.md)).
 
 ---
 
@@ -81,8 +84,10 @@ All application settings are managed in `.env` and typed via Pydantic Settings.
 | `OUTPUT_USD_PER_MILLION`| decimal string | Rate in USD | e.g. `0.40` | Provider pricing rate per 1M output tokens for internal cost accounting. |
 | `PRICING_SOURCE_URL` | string | URL string | e.g. `https://ai.google.dev/pricing` | Documented source URL for token pricing provenance. |
 | `PRICING_CHECKED_AT` | string | Date string (`YYYY-MM-DD`) | e.g. `2026-10-21` | Date when the pricing rates were verified. |
-| `SHEETS_SPREADSHEET_ID`| string | Google Spreadsheet ID | Optional | Target Google Spreadsheet ID for outbound expense sync. |
-| `SHEETS_ACCESS_TOKEN` | string | OAuth Bearer token | Optional | Access token with Google Sheets edit permissions. |
+| `AUTO_RECORD` | boolean | `true`, `false` | `false` | When `true`, documents with 0 critical review issues are recorded into confirmed expenses automatically. |
+| `SHEETS_WEBHOOK_URL` | string | URL string | Optional | Google Apps Script Web App URL for 100% free outbound Google Sheets sync. |
+| `SHEETS_SPREADSHEET_ID`| string | Google Spreadsheet ID | Optional | Target Google Spreadsheet ID for Google Sheets API v4 outbound expense sync. |
+| `SHEETS_ACCESS_TOKEN` | string | OAuth Bearer token | Optional | Access token with Google Sheets API v4 edit permissions. |
 | `TRACING_BACKENDS` | string | `none`, `langfuse`, `langsmith`, `both` | `none` | External LLM observability export. Keep `none` to use internal database audit feed without cloud tracing. |
 
 ---
@@ -91,7 +96,8 @@ All application settings are managed in `.env` and typed via Pydantic Settings.
 
 All endpoints under `/api/v1` require `Authorization: Bearer <REVIEWER_TOKEN>`.
 
-- `POST /api/v1/documents`: Upload and inspect a receipt/invoice document (multipart/form-data: `file`, `project_id`, optional `Idempotency-Key` header).
+- `POST /api/v1/documents`: Upload and inspect a receipt/invoice document (multipart/form-data: `file`, `project_id`, optional `Idempotency-Key` header, optional `auto_record`).
+- `POST /api/v1/batch-upload`: Upload multiple files simultaneously for sequential queue execution (multipart/form-data: `files`, `project_id`, optional `auto_record`).
 - `GET /api/v1/documents/{id}`: Retrieve document extraction status, candidate fields, and review issues.
 - `PATCH /api/v1/documents/{id}/fields`: Correct or update candidate extraction fields before confirmation.
 - `POST /api/v1/documents/{id}/confirm`: Confirm and record an expense into the authoritative ledger.

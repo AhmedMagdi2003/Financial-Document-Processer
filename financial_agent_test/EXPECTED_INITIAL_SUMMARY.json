@@ -1,0 +1,100 @@
+{
+  "scope": "Only auto-recordable documents; confirm actual policy. No reviewer overrides applied.",
+  "recorded_case_ids": [
+    "F01",
+    "F02",
+    "F03",
+    "F04",
+    "F05",
+    "F06",
+    "F07",
+    "F08",
+    "F09",
+    "F15A",
+    "F16",
+    "F17"
+  ],
+  "excluded_pending_or_failed": [
+    "F10",
+    "F11",
+    "F12",
+    "F13",
+    "F14",
+    "F15B",
+    "F18"
+  ],
+  "summary": [
+    {
+      "project": "Civic Data Lab",
+      "category": "Equipment",
+      "currency": "USD",
+      "amount": "990.00"
+    },
+    {
+      "project": "Civic Data Lab",
+      "category": "Events",
+      "currency": "EUR",
+      "amount": "540.00"
+    },
+    {
+      "project": "Civic Data Lab",
+      "category": "Operational Expenses",
+      "currency": "EGP",
+      "amount": "1150.00"
+    },
+    {
+      "project": "Civic Data Lab",
+      "category": "Travel",
+      "currency": "EGP",
+      "amount": "480.00"
+    },
+    {
+      "project": "Mobility Mapping",
+      "category": "Operational Expenses",
+      "currency": "EGP",
+      "amount": "570.00"
+    },
+    {
+      "project": "Mobility Mapping",
+      "category": "Software",
+      "currency": "EUR",
+      "amount": "240.00"
+    },
+    {
+      "project": "Mobility Mapping",
+      "category": "Software",
+      "currency": "USD",
+      "amount": "75.00"
+    },
+    {
+      "project": "Urban Climate Research",
+      "category": "Equipment",
+      "currency": "EUR",
+      "amount": "144.00"
+    },
+    {
+      "project": "Urban Climate Research",
+      "category": "Events",
+      "currency": "EGP",
+      "amount": "180.00"
+    },
+    {
+      "project": "Urban Climate Research",
+      "category": "Events",
+      "currency": "EUR",
+      "amount": "345.00"
+    },
+    {
+      "project": "Urban Climate Research",
+      "category": "Software",
+      "currency": "USD",
+      "amount": "120.00"
+    },
+    {
+      "project": "Urban Climate Research",
+      "category": "Travel",
+      "currency": "EGP",
+      "amount": "275.00"
+    }
+  ]
+}

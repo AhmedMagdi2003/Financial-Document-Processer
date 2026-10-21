@@ -1,0 +1,24 @@
+{
+  "upload_order": [
+    "F01_digital_cloud_subscription.pdf",
+    "F02_photo_city_taxi.jpg",
+    "F03_digital_workshop_venue.pdf",
+    "F04_digital_printing.pdf",
+    "F05_photo_field_recorder.jpg",
+    "F06_scanned_inclusive_vat.pdf",
+    "F07_digital_discount_tax.pdf",
+    "F08_digital_partial_payment.pdf",
+    "F09_mixed_pdf_page2_image.pdf",
+    "F10_missing_currency.pdf",
+    "F11_missing_grand_total.pdf",
+    "F12_arithmetic_conflict.pdf",
+    "F13_rerendered_workshop_venue.pdf",
+    "F14_exact_duplicate_cloud_subscription.pdf",
+    "F15A_cafe_receipt_lunch.png",
+    "F15B_cafe_receipt_drinks.png",
+    "F16_adversarial_footer_invoice.pdf",
+    "F17_blurry_scan_receipt.pdf",
+    "F18_invalid_pdf.pdf"
+  ],
+  "notes": "Order matters for duplicate relationships. F15A must precede F15B. F03 must precede F13. F01 must precede F14."
+}

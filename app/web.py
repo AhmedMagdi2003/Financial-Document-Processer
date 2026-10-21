@@ -23,6 +23,7 @@ from app import financial
 from app.ai import ProviderError
 from app.config import Settings
 from app.db import make_engine, query_metrics
+from app.errors import map_error
 from app.inspection import FileRejected
 from app.integrations import IntegrationError, Storage
 from app.models import (
@@ -70,6 +71,7 @@ def create_app(settings=None, engine=None):
         max_age=3600,
     )
     templates = Jinja2Templates(directory=str(ROOT / "templates"))
+    templates.env.globals["map_error"] = map_error
     application.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
     attempts = defaultdict(list)
 
@@ -154,16 +156,19 @@ def create_app(settings=None, engine=None):
 
     @application.exception_handler(financial.Conflict)
     async def conflict(request, exc):
-        return JSONResponse({"detail": str(exc)}, status_code=409)
+        err = map_error(str(exc))
+        return JSONResponse({"detail": str(exc), "error": err.to_dict()}, status_code=409)
 
     @application.exception_handler(FileRejected)
     async def rejected(request, exc):
-        return JSONResponse({"detail": str(exc)}, status_code=422)
+        err = map_error(str(exc))
+        return JSONResponse({"detail": str(exc), "error": err.to_dict()}, status_code=422)
 
     @application.exception_handler(ProviderError)
     @application.exception_handler(IntegrationError)
     async def provider_failure(request, exc):
-        return JSONResponse({"detail": str(exc)}, status_code=503)
+        err = map_error(str(exc))
+        return JSONResponse({"detail": str(exc), "error": err.to_dict()}, status_code=503)
 
     @application.exception_handler(httpx.HTTPError)
     async def transport_failure(request, exc):
@@ -358,14 +363,82 @@ def create_app(settings=None, engine=None):
         session: DB,
         actor: Actor,
         idempotency_key: Annotated[str | None, Header(max_length=200)] = None,
+        auto_record: Annotated[bool | None, Form()] = None,
     ):
         data = file.file.read(cfg.max_file_bytes + 1)
         doc, created = financial.upload(
             session, cfg, data, file.filename or "document", project_id, actor, idempotency_key
         )
         if created:
-            doc = financial.process(session, cfg, doc.id, actor)
-        return {"document": record(doc), "reused": not created}
+            doc = financial.process(session, cfg, doc.id, actor, auto_record=auto_record)
+        issues = session.scalars(
+            select(Issue).where(Issue.document_id == doc.id, Issue.resolution.is_(None))
+        ).all()
+        doc_dict = record(doc)
+        if doc.error_code:
+            doc_dict["human_error"] = map_error(doc.error_code).to_dict()
+        return {
+            "document": doc_dict,
+            "reused": not created,
+            "duplicate": not created,
+            "issues": [record(i) for i in issues],
+            "auto_recorded": doc.state == "RECORDED",
+        }
+
+    @application.post("/api/v1/batch-upload")
+    def batch_upload(
+        files: list[UploadFile],
+        project_id: Annotated[str, Form()],
+        session: DB,
+        actor: Actor,
+        auto_record: Annotated[bool | None, Form()] = None,
+    ):
+        results = []
+        for file in files:
+            fname = file.filename or "document"
+            try:
+                data = file.file.read(cfg.max_file_bytes + 1)
+                doc, created = financial.upload(
+                    session, cfg, data, fname, project_id, actor
+                )
+                if created:
+                    doc = financial.process(session, cfg, doc.id, actor, auto_record=auto_record)
+                issues = session.scalars(
+                    select(Issue).where(Issue.document_id == doc.id, Issue.resolution.is_(None))
+                ).all()
+                doc_dict = record(doc)
+                if doc.error_code:
+                    doc_dict["human_error"] = map_error(doc.error_code).to_dict()
+                results.append({
+                    "filename": fname,
+                    "document": doc_dict,
+                    "reused": not created,
+                    "state": doc.state,
+                    "auto_recorded": doc.state == "RECORDED",
+                    "issues": [record(i) for i in issues],
+                    "status": "success",
+                })
+            except Exception as exc:
+                err = map_error(exc)
+                results.append({
+                    "filename": fname,
+                    "document": None,
+                    "state": "FAILED",
+                    "auto_recorded": False,
+                    "issues": [],
+                    "human_error": err.to_dict(),
+                    "status": "error",
+                    "detail": str(exc),
+                })
+        return {
+            "total": len(results),
+            "recorded": sum(1 for r in results if r.get("auto_recorded")),
+            "review": sum(1 for r in results if r.get("state") == "NEEDS_REVIEW"),
+            "failed": sum(
+                1 for r in results if r.get("state") == "FAILED" or r.get("status") == "error"
+            ),
+            "results": results,
+        }
 
     @application.get("/api/v1/documents/{document_id}")
     def document_status(document_id: str, session: DB, actor: Actor):

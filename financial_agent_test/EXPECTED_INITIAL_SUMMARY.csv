@@ -1,0 +1,13 @@
+project,category,currency,amount
+Civic Data Lab,Equipment,USD,990.00
+Civic Data Lab,Events,EUR,540.00
+Civic Data Lab,Operational Expenses,EGP,1150.00
+Civic Data Lab,Travel,EGP,480.00
+Mobility Mapping,Operational Expenses,EGP,570.00
+Mobility Mapping,Software,EUR,240.00
+Mobility Mapping,Software,USD,75.00
+Urban Climate Research,Equipment,EUR,144.00
+Urban Climate Research,Events,EGP,180.00
+Urban Climate Research,Events,EUR,345.00
+Urban Climate Research,Software,USD,120.00
+Urban Climate Research,Travel,EGP,275.00

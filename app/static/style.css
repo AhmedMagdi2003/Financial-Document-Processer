@@ -863,3 +863,60 @@ footer {
 
 }
 
+
+/* Batch Progress and Error Styles */
+.batch-panel {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+  margin-top: 24px;
+}
+.batch-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.progress-bar-container {
+  width: 100%;
+  height: 10px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--teal);
+  transition: width 0.3s ease;
+}
+.batch-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.batch-table th, .batch-table td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+.badge-status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.badge-queued { background: #f3f4f6; color: #4b5563; }
+.badge-processing { background: #dbeafe; color: #1e40af; }
+.badge-recorded { background: #dcfce7; color: #166534; }
+.badge-review { background: #fef3c7; color: #92400e; }
+.badge-failed { background: #fee2e2; color: #991b1b; }
+.badge-duplicate { background: #f3e8ff; color: #6b21a8; }
+.human-error-card {
+  border-left: 4px solid var(--red);
+  background: #fef2f2;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
