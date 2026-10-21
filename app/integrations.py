@@ -16,7 +16,7 @@ class Storage:
 
     def put(self, key, data, mime):
         cfg = self.settings
-        if cfg.mode == "demo":
+        if not (cfg.supabase_url and cfg.supabase_service_key.get_secret_value()):
             path = cfg.local_data_dir / "originals" / key
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
@@ -36,7 +36,7 @@ class Storage:
 
     def get(self, key):
         cfg = self.settings
-        if cfg.mode == "demo":
+        if not (cfg.supabase_url and cfg.supabase_service_key.get_secret_value()):
             root = (cfg.local_data_dir / "originals").resolve()
             path = (root / key).resolve()
             if not path.is_relative_to(root):

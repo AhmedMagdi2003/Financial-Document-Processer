@@ -51,8 +51,7 @@ class Settings(BaseSettings):
             value = getattr(self, name).get_secret_value()
             if len(value) < (24 if name != "database_url" else 1):
                 raise RuntimeError(f"Configure {name.upper()} before starting")
-        if self.mode == "cloud":
-            if not self.database_url.get_secret_value().startswith("postgresql+psycopg://"):
-                raise RuntimeError("Cloud mode requires Supabase PostgreSQL")
-            if not self.supabase_url or not self.supabase_service_key.get_secret_value():
-                raise RuntimeError("Cloud mode requires Supabase private Storage configuration")
+        if self.mode == "cloud" and not self.database_url.get_secret_value().startswith(
+            "postgresql+psycopg://"
+        ):
+            raise RuntimeError("Cloud mode requires Supabase PostgreSQL")
