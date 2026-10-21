@@ -1,7 +1,7 @@
 {
   "source": "The fictional River Research team completed a workshop on water sampling. Participants reviewed the field protocol and agreed to test a revised checklist. The next step is to collect feedback on the checklist. No research results or participant counts have been reported.",
-  "id": "c3aadf2f-07e3-4abb-b72e-a94abffa7ce0:2",
-  "content_id": "c3aadf2f-07e3-4abb-b72e-a94abffa7ce0",
+  "id": "5d78aadf-e3f4-4a76-a0c4-03327937c90e:2",
+  "content_id": "5d78aadf-e3f4-4a76-a0c4-03327937c90e",
   "number": 2,
   "drafts": {
     "linkedin": "Project update\n\nThe fictional River Research team completed a workshop on water sampling. Participants reviewed the field protocol and agreed to test a revised checklist. The next step is to collect feedback on the checklist. No research results or participant counts have been reported.\n\n#Research",
@@ -14,6 +14,8 @@
     "newsletter",
     "website"
   ],
+  "decision": "draft",
+  "decision_reason": null,
   "approved_by": null,
   "approved_at": null
 }

@@ -55,6 +55,9 @@ Actual narrow-viewport dashboard capture from the running demo:
    that revision to the test destinations. Open the resulting pages and log.
    Editing invalidates approval. Retry skips successful channels; each channel has
    at most three attempts. Previously published pages remain historical artifacts.
+   **Reject revision** retains a reason and blocks publication until a new revision
+   is saved; it cannot retract an already published page. API:
+   `POST /api/v1/content/{id}/reject` with revision and justification.
 5. **Operations:** search exact run/request/document/content IDs for routing, validation,
    human decisions and HTTP integration events. Inspect timings and provider usage.
 
@@ -205,11 +208,16 @@ Langfuse and LangSmith exporters are **not implemented/verified**. Selecting an
 exporter currently blocks live calls with `TRACE_EXPORTER_NOT_VERIFIED` to avoid
 silently exporting private source data. `TRACING_BACKENDS=none` is supported. The
 internal Operations view works without cloud tracing.
+Ambient LangSmith tracing is explicitly disabled inside both graphs and model calls
+when running this implementation, so unrelated shell settings cannot export source data.
 
 ```powershell
 uv run ruff check .
 uv run pytest -q
 ```
+
+Latest local validation: **48 tests passed**; Ruff passed. GitHub Actions runs the
+same checks after push; a configured workflow alone is not proof that hosted CI passed.
 
 Fixtures are fictional, labeled and versioned in `tests/fixtures/ground_truth.json`.
 Tests use isolated SQLite, fake models and explicit fake transports, plus a real

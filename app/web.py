@@ -45,6 +45,7 @@ from app.schemas import (
     CategoryInput,
     ConfirmInput,
     ContentInput,
+    RejectionInput,
     ReviewInput,
     RevisionInput,
 )
@@ -569,5 +570,9 @@ def create_app(settings=None, engine=None):
                 session, cfg, content_id, body.revision, body.digest, actor, retry=True
             )
         ]
+
+    @application.post("/api/v1/content/{content_id}/reject")
+    def reject_content(content_id: str, body: RejectionInput, session: DB, actor: Actor):
+        return record(content.reject(session, content_id, body.revision, body.justification, actor))
 
     return application

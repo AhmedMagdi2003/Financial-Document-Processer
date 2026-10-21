@@ -8,6 +8,7 @@ from typing import TypedDict
 
 import httpx
 from langgraph.graph import END, START, StateGraph
+from langsmith import tracing_context
 from sqlalchemy import select, update
 
 from app.ai import provider_for
@@ -87,7 +88,8 @@ def generate(session, settings, source, actor, provider=None):
     graph.add_edge("draft", "save_revision")
     graph.add_edge("save_revision", END)
     try:
-        graph.compile().invoke({}, {"recursion_limit": 5})
+        with tracing_context(enabled=False):
+            graph.compile().invoke({}, {"recursion_limit": 5})
     except Exception:
         # Persist failed call usage/events while never storing a successful content item.
         emit(
@@ -132,6 +134,8 @@ def revise(session, content_id, expected, drafts, channels, actor):
         session.rollback()
         raise Conflict("Concurrent edit; reload")
     old.approved_at = old.approved_by = None
+    if old.decision == "approved":
+        old.decision = "invalidated"
     data = drafts.model_dump()
     revision = Revision(
         id=revision_id(content_id, expected + 1),
@@ -149,6 +153,35 @@ def revise(session, content_id, expected, drafts, channels, actor):
     return revision
 
 
+def reject(session, content_id, expected, justification, actor):
+    item = session.scalar(select(Content).where(Content.id == content_id).with_for_update())
+    if not item or item.revision != expected:
+        raise Conflict("Content changed; reload before rejecting")
+    revision = session.get(Revision, revision_id(content_id, expected))
+    if revision.approved_at:
+        raise Conflict("Already approved; create a new revision for another decision")
+    claimed = session.execute(
+        update(Content)
+        .where(Content.id == content_id, Content.revision == expected)
+        .values(revision=expected)
+    )
+    if claimed.rowcount != 1:
+        raise Conflict("Concurrent edit; reload")
+    revision.decision, revision.decision_reason = "rejected", justification
+    emit(
+        session,
+        "human",
+        "reject_content",
+        "rejected",
+        resource_id=content_id,
+        actor=actor,
+        revision=expected,
+        reason_recorded=True,
+    )
+    session.commit()
+    return revision
+
+
 def approve_publish(
     session, settings, content_id, expected, digest, actor, publisher=None, retry=False
 ):
@@ -156,12 +189,15 @@ def approve_publish(
     if not item or item.revision != expected:
         raise Conflict("Content changed; approve the current revision")
     revision = session.get(Revision, revision_id(content_id, expected))
+    if revision.decision == "rejected":
+        raise Conflict("This revision was rejected; save a revised draft before approval")
     if revision.digest != digest or digest != revision_hash(revision.drafts, revision.channels):
         raise Conflict("Content hash changed; reload and approve again")
     if retry and not revision.approved_at:
         raise Conflict("This revision has not been approved")
     if not retry:
         revision.approved_at, revision.approved_by = now(), actor
+        revision.decision = "approved"
         emit(
             session,
             "human",

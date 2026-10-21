@@ -8,6 +8,7 @@ from typing import TypedDict
 
 import httpx
 from langgraph.graph import END, START, StateGraph
+from langsmith import tracing_context
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
@@ -129,7 +130,42 @@ def find_duplicates(session, candidate, document_id):
                 if left.isdisjoint(right):
                     continue
             matches.append(other.document_id)
-    return matches
+    # Also compare unconfirmed candidates: duplicate checks must not wait for the
+    # first receipt to enter the expense tracker. State is indexed; the small
+    # pending queue is compared in Python without making JSON provider-specific.
+    pending = session.scalars(
+        select(Document).where(
+            Document.id != document_id, Document.state.in_(["READY_TO_RECORD", "NEEDS_REVIEW"])
+        )
+    ).all()
+    for other_doc in pending:
+        if not other_doc.candidate:
+            continue
+        other = Candidate.model_validate(other_doc.candidate)
+        if normalized(other.vendor) != vendor:
+            continue
+        same_number = (
+            candidate.document_number
+            and other.document_number
+            and normalized(candidate.document_number) == normalized(other.document_number)
+        )
+        same_purchase = (
+            candidate.grand_total is not None
+            and candidate.currency is not None
+            and candidate.date is not None
+            and candidate.date == other.date
+            and candidate.grand_total == other.grand_total
+            and candidate.currency == other.currency
+        )
+        if not same_number and not same_purchase:
+            continue
+        if not same_number and candidate.items and other.items:
+            left = {normalized(item.description) for item in candidate.items}
+            right = {normalized(item.description) for item in other.items}
+            if left.isdisjoint(right):
+                continue
+        matches.append(other_doc.id)
+    return list(dict.fromkeys(matches))
 
 
 def apply_issues(session, document, candidate, actor):
@@ -305,7 +341,8 @@ def process(session, settings, document_id, actor="demo-reviewer", provider=None
     graph.add_edge("categorize", "validate_persist")
     graph.add_edge("validate_persist", END)
     try:
-        graph.compile().invoke({}, {"recursion_limit": 8})
+        with tracing_context(enabled=False):
+            graph.compile().invoke({}, {"recursion_limit": 8})
         attempt.status = "succeeded"
         document.error_code = None
     except Exception as exc:

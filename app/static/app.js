@@ -76,6 +76,12 @@ async function publish(retry) {
 }
 document.querySelector('#approve-publish')?.addEventListener('click', () => publish(false));
 document.querySelector('#retry-publish')?.addEventListener('click', () => publish(true));
+const rejectForm = document.querySelector('#reject-form');
+action(rejectForm, async data => {
+  await api(`/api/v1/content/${rejectForm.dataset.id}/reject`, 'POST', {
+    revision: Number(rejectForm.dataset.revision), justification: data.get('justification')});
+  location.reload();
+});
 document.querySelectorAll('.category-form').forEach(form => action(form, async data => {
   await api(`/api/v1/categories/${form.dataset.id}`, 'PATCH', {name: data.get('name'), definition: data.get('definition'), active: data.has('active')});
   notice('Category saved. Its ID and historical records are preserved.');

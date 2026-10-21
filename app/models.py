@@ -138,6 +138,8 @@ class Revision(Base):
     drafts: Mapped[dict] = mapped_column(JSON)
     digest: Mapped[str] = mapped_column(String(64))
     channels: Mapped[list] = mapped_column(JSON)
+    decision: Mapped[str] = mapped_column(String(20), default="draft", server_default="draft")
+    decision_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     approved_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

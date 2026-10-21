@@ -9,7 +9,7 @@ dependencies = [
   "python-multipart>=0.0.20,<1", "httpx>=0.28,<1", "itsdangerous>=2.2,<3",
   "pymupdf>=1.25,<2", "pillow>=11,<13", "pycountry>=24.6",
   "langgraph>=1,<2", "langchain-openai>=1,<2",
-  "langchain-google-genai>=4,<5", "langchain-xai>=1,<2"
+  "langchain-google-genai>=4,<5", "langchain-xai>=1,<2", "langsmith>=0.14,<1"
 ]
 
 [dependency-groups]

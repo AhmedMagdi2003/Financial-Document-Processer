@@ -20,6 +20,9 @@ class Model:
         return self
 
     def invoke(self, *args, **kwargs):
+        from langsmith.run_helpers import get_tracing_context
+
+        assert get_tracing_context()["enabled"] is False
         self.calls += 1
         if self.fail:
             raise TimeoutError("This raw error must not appear in events")
@@ -88,3 +91,16 @@ def test_grok_image_path_is_explicitly_rejected(runtime):
         )
         with pytest.raises(ProviderError, match="UNSUPPORTED_CAPABILITY"):
             provider.extract(Inspection("image/png", 1, "vision", "test", images=[b"image"]), "sha")
+
+
+def test_disabled_traces_override_ambient_export(runtime, monkeypatch):
+    from langsmith import tracing_context
+
+    cfg, app, _ = runtime
+    model = Model()
+    with app.state.sessions() as session:
+        provider = LiveProvider(configured(cfg), session, "privacy-test")
+        monkeypatch.setattr(provider, "_model", lambda: model)
+        with tracing_context(enabled=True):
+            provider.extract(Inspection("text/plain", 1, "text", "test", "Invoice"), "sha")
+        assert model.calls == 1

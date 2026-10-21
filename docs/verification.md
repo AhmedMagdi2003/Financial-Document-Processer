@@ -53,3 +53,21 @@ No video was recorded; that deliverable remains outstanding.
 GitHub remote was empty when checked. Existing credential-manager access passed
 `git push --dry-run origin main`; that check did not publish commits. A real push
 and remote SHA verification must be recorded separately before claiming submission.
+
+## Rejection, migration and final boundary checks
+
+`uv run ruff check .`: PASS. `uv run pytest -q`: **48 passed in 13.95s**.
+`uv sync --locked --offline`: PASS using the installed dependency cache.
+Added rejection with retained reason, approved-revision-preserving additive migration,
+pending-candidate duplicate comparison, re-extraction history, currency/category/date
+filters and JPEG/PNG/WEBP signature tests. Disabled tracing now explicitly overrides
+ambient LangSmith settings to prevent unintended raw-input export.
+
+Browser rejection verified: content `d02e0dde-25e2-4936-8e9e-ba5075656934`, revision 1.
+The reason was retained, decision displayed Rejected, no publication was created.
+The mixed PDF's second page was rendered and visually inspected: the EUR 120.00
+grand total is visible only in its image, matching the mixed/fallback routing test.
+
+GitHub Actions is configured to install from uv.lock, run Ruff and run pytest.
+The hosted CI run has not been observed yet. Local Windows results above are actual;
+Linux CI and all live cloud/provider integrations must be verified separately.

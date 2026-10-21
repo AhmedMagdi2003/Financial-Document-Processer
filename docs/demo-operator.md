@@ -36,6 +36,9 @@ content ID `75c1dc2e-a64c-4fa0-82cf-69e3d9dacb36`, revision 2, all three destina
 published on their first attempt. See `docs/screenshots/publication-2026-10-21.png`.
 This URL is local and requires the retained demo database, not a hosted submission URL.
 The separate automated real-HTTP run's IDs/URLs are in `sample_outputs/smoke-evidence.json`.
+Rejection was also verified in the browser on content
+`d02e0dde-25e2-4936-8e9e-ba5075656934`: the reason is retained and publication is
+blocked until a revised draft is saved. This is optional footage if time permits.
 
 Keep browser text readable. Include titles/outro in the <=300-second measurement.
 Record to a private path under `recordings/` (ignored), verify playback and duration,

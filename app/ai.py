@@ -8,6 +8,8 @@ from pathlib import Path
 from time import perf_counter, sleep
 from typing import Protocol
 
+from langsmith import tracing_context
+
 from app.models import Usage
 from app.observability import emit
 from app.schemas import Candidate, CategoryChoice, Drafts
@@ -144,14 +146,16 @@ class LiveProvider:
             )
             self.session.add(usage)
             try:
-                result = (
-                    self._model()
-                    .with_structured_output(schema, include_raw=True)
-                    .invoke(
-                        [("system", system), ("human", blocks)],
-                        config={"run_name": operation, "tags": [self.run_id, PROMPT_VERSION]},
+                # Explicit none overrides ambient tracing that could export private inputs.
+                with tracing_context(enabled=False):
+                    result = (
+                        self._model()
+                        .with_structured_output(schema, include_raw=True)
+                        .invoke(
+                            [("system", system), ("human", blocks)],
+                            config={"run_name": operation, "tags": [self.run_id, PROMPT_VERSION]},
+                        )
                     )
-                )
                 raw_usage = getattr(result.get("raw"), "usage_metadata", None) or {}
                 usage.input_tokens = raw_usage.get("input_tokens")
                 usage.output_tokens = raw_usage.get("output_tokens")

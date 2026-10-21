@@ -94,6 +94,8 @@ CREATE TABLE content_revisions (
 	drafts JSON NOT NULL, 
 	digest VARCHAR(64) NOT NULL, 
 	channels JSON NOT NULL, 
+	decision VARCHAR(20) DEFAULT 'draft' NOT NULL, 
+	decision_reason TEXT, 
 	approved_by VARCHAR(100), 
 	approved_at TIMESTAMP WITH TIME ZONE, 
 	PRIMARY KEY (id), 

@@ -100,6 +100,11 @@ class ApprovalInput(BaseModel):
     digest: str = Field(min_length=64, max_length=64)
 
 
+class RejectionInput(BaseModel):
+    revision: int = Field(ge=1)
+    justification: str = Field(min_length=10, max_length=2000)
+
+
 class ReviewInput(BaseModel):
     version: int = Field(ge=1)
     candidate: Candidate
