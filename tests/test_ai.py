@@ -37,6 +37,7 @@ def configured(cfg):
         update={
             "provider": "openai",
             "model_name": "fake-model",
+            "max_llm_calls": 3,
             "openai_api_key": SecretStr("fake"),
             "input_usd_per_million": "0.10",
             "output_usd_per_million": "0.40",

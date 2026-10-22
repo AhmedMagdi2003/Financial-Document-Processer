@@ -81,13 +81,20 @@ flowchart TD
 3. **Multi-Format Ingestion**:
    - Supports PDF, PNG, JPEG, and WEBP.
    - Batch upload interface processes documents sequentially in an isolated queue with live visual progress.
-4. **Enhanced Data Visualizations**:
-   - Dynamic Doughnut/Pie chart with exact dollar amounts and percentages rendered directly on each slice.
+4. **Unified Multi-Currency Reporting**:
+   - Choose USD, EUR, or EGP from the application-wide top bar. Spend totals, category summaries, timelines, and each confirmed expense are converted into that reporting currency while original invoice amounts remain unchanged.
+   - The finance view shows the source-currency breakdown, exchange-rate pairs, provider, and rate update date. Rates use ExchangeRate-API Open Access (free, keyless endpoint) and are cached briefly; this is for reporting, not accounting or settlement.
+5. **Enhanced Data Visualizations**:
+   - Dynamic doughnut/pie chart with exact reporting-currency amounts and percentages rendered directly on each slice.
    - Interactive, instant table sorting by **Invoice Date**, **Date Added to Project**, **Vendor**, and **Amount**.
-5. **No-Paywall Cloud Automations**:
+6. **No-Paywall Cloud Automations**:
    - **Google Drive**: Background Apps Script polling every **1 minute** + instant one-click sync, plus ready-to-use Make.com scenario blueprint.
-   - **Google Sheets**: Free bidirectional webhook integration updating spreadsheet rows without Google API quota limits or Zapier subscription fees.
+   - **Google Sheets**: Apps Script webhook integration that updates/removes matching expense rows without a paid Zapier workflow; subject to Google's Apps Script quotas.
    - **Tunnel & Hosting Switcher**: Built-in switcher between **Render** and **ngrok** via `.env`.
+
+## Assessment coverage
+
+This repository contains the finance agent. The content-generation and publishing agent is maintained separately at [Content-Agent](https://github.com/AhmedMagdi2003/Content-Agent). The full requirement mapping, honest demo limitations, and candidate summary are in [docs/TECHNICAL_ASSESSMENT_AND_CANDIDATE_SUMMARY.md](docs/TECHNICAL_ASSESSMENT_AND_CANDIDATE_SUMMARY.md).
 
 ---
 
@@ -124,54 +131,9 @@ Sign in using your reviewer access token.
 
 ---
 
-## How to Create and Manage Projects (Like `river`)
-
-Projects isolate budgets, expense records, categories, and documents. The system comes pre-seeded with project `river` and `skills`. Here is how you create new projects:
-
-### Method A: Through the Web Interface (Recommended)
-1. In the left navigation sidebar, click **Projects** (`/projects`).
-2. Under **Create a project**, fill in:
-   - **Project name**: The human-readable title (e.g., `Solar Microgrid Initiative` or `Community Water Fund`).
-   - **Permanent project ID**: Lowercase alphanumeric slug with hyphens or underscores (e.g., `solar-microgrid` or `community-water`).
-3. Click **Create project**.
-4. The project is immediately available in the upload dropzone, review filters, and expense tracker.
-
-### Method B: Via Authenticated REST API
-Send an authenticated `POST` request to `/api/v1/projects`:
-```bash
-curl -X POST http://127.0.0.1:8000/api/v1/projects \
-  -H "Authorization: Bearer <YOUR_REVIEWER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "solar-microgrid",
-    "name": "Solar Microgrid Initiative"
-  }'
-```
-Response (`201 Created`):
-```json
-{
-  "id": "solar-microgrid",
-  "name": "Solar Microgrid Initiative"
-}
-```
-
-### Method C: Via Direct SQL (Supabase SQL Editor)
-```sql
-INSERT INTO projects (id, name, created_at)
-VALUES ('solar-microgrid', 'Solar Microgrid Initiative', NOW())
-ON CONFLICT (id) DO NOTHING;
-```
-
-### Using Your New Project in Automations:
-- **Web UI Dropzone**: Select `Solar Microgrid Initiative` from the Project dropdown before dropping files.
-- **Google Drive Apps Script**: In `DriveIngestion.gs`, set Script Property `PROJECT_ID = "solar-microgrid"`.
-- **Make.com**: In the HTTP module multipart fields, set `project_id = "solar-microgrid"`.
-
----
-
 ## Team Access Tokens & User Attribution
 
-To allow team members to access the web app and attribute their actions in audit logs, manage tokens using [scripts/manage_tokens.py](file:///D:/ImpactCircles/Financial-Document-Processer/scripts/manage_tokens.py):
+To allow team members to access the web app and attribute their actions in audit logs, manage tokens using [scripts/manage_tokens.py](scripts/manage_tokens.py):
 
 ```powershell
 # 1. Create a token for a team member
@@ -194,17 +156,17 @@ When Sarah Connor signs in using her token (`tok_sarah_connor_...`):
 ## Cloud & Automation Integrations
 
 ### 1. Google Drive Ingestion (1-Minute Automated Polling + On-Demand)
-- Located at [scripts/google_apps_script/DriveIngestion.gs](file:///D:/ImpactCircles/Financial-Document-Processer/scripts/google_apps_script/DriveIngestion.gs).
+- Located at [scripts/google_apps_script/DriveIngestion.gs](scripts/google_apps_script/DriveIngestion.gs).
 - Automated cloud trigger runs every **1 minute** via `installDriveTrigger()`.
 - Instant execution function `syncNow()` allows one-click runs from the Google Apps Script editor.
 - Automatically computes SHA-256 idempotency keys; duplicate files or repeated runs are completely safe.
 
 ### 2. Make.com No-Code Scenario
-- Import the pre-configured blueprint from [scripts/make/google_drive_to_finance_blueprint.json](file:///D:/ImpactCircles/Financial-Document-Processer/scripts/make/google_drive_to_finance_blueprint.json).
+- Import the pre-configured blueprint from [scripts/make/google_drive_to_finance_blueprint.json](scripts/make/google_drive_to_finance_blueprint.json).
 - Downloads files from Google Drive and streams them directly as multipart/form-data to `/api/v1/documents`.
 
-### 3. Google Sheets Outbound Sync
-- Located at [scripts/google_apps_script/SheetsWebhook.gs](file:///D:/ImpactCircles/Financial-Document-Processer/scripts/google_apps_script/SheetsWebhook.gs).
+### 3. Google Sheets Sync
+- Located at [scripts/google_apps_script/SheetsWebhook.gs](scripts/google_apps_script/SheetsWebhook.gs).
 - Automatically writes and updates expenses in your Google Sheet under the **Expenses** tab.
 - Handles retries, formula escaping, and currency values safely.
 
@@ -253,6 +215,7 @@ All endpoints require `Authorization: Bearer <TOKEN>`:
 | `POST` | `/api/v1/documents/{id}/dismiss` | Dismiss document from active processing |
 | `DELETE`| `/api/v1/documents/{id}` | Permanently delete document and its associated records |
 | `GET` | `/api/v1/expenses` | Query confirmed expenses (`sort_by=date|added|amount`, `project`, `category`) |
+| `GET` | `/api/v1/exchange-rates` | Authenticated latest daily exchange rates for supported reporting currencies (USD, EUR, EGP); accepts `base` and `symbols` |
 | `POST` | `/api/v1/projects` | Create a new project (`id`, `name`) |
 | `GET` | `/api/v1/projects` | List all projects |
 | `POST` | `/api/v1/tokens` | Generate personal access token for a team member |
@@ -261,6 +224,10 @@ All endpoints require `Authorization: Bearer <TOKEN>`:
 
 ---
 
+## Demo video
+
+The currency-reporting preview and repeatable recording instructions are in [the financial demo video guide](docs/FINANCIAL_DEMO_VIDEO_GUIDE.md). The current MP4 uses an isolated database with fictional sample expenses; it demonstrates reporting-currency conversion and does not claim AI extraction or external Drive/Sheets delivery.
+
 ## Test Verification
 
 Run the full automated test suite (all unit tests, integration tests, validation gates, and oracle benchmarks):
@@ -268,4 +235,4 @@ Run the full automated test suite (all unit tests, integration tests, validation
 ```powershell
 uv run python -m pytest
 ```
-*Result: 72 passed (100%).*
+*Result: 74 passed (100%) in the current local offline run. External provider/Google account behavior is not covered by that claim.*

@@ -131,8 +131,8 @@ If you want to keep the server running on your computer:
    - `AUTO_RECORD`: `true`
 6. In the function dropdown, select `processNewInvoices` and click **Run** to grant Google Drive permissions.
 7. In the dropdown, select `installDriveTrigger` and click **Run**.
-   *This schedules the poller to check your Google Drive folder every 5 minutes automatically!*
-8. **Test it:** Drop a PDF invoice into your Google Drive folder. Within 5 minutes, it will be uploaded to your backend, extracted with AI, recorded, and posted into your Google Sheet!
+   *This schedules the poller to check your Google Drive folder every 1 minute automatically!*
+8. **Test it:** Drop a PDF invoice into your Google Drive folder. The next poll attempts upload and extraction; whether it is recorded depends on validation and the configured review policy. A confirmed expense can then sync to Google Sheets.
 
 ---
 

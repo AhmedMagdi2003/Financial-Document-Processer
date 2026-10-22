@@ -6,11 +6,20 @@ function doPost(e) {
     const body = JSON.parse(e.postData.contents);
     const secret = props.getProperty('SHEETS_WEBHOOK_SECRET');
     if (!secret || secret.length < 24 || body.secret !== secret) throw new Error('Unauthorized');
-    if (!Array.isArray(body.values) || body.values.length !== 8 ||
-        typeof body.values[0] !== 'string' || !body.values[0]) throw new Error('Invalid values');
     lock.waitLock(20000);
     const sheet = SpreadsheetApp.openById(props.getProperty('SPREADSHEET_ID')).getSheetByName('Expenses');
     if (!sheet) throw new Error('Missing Expenses sheet');
+    if (body.action === 'delete') {
+      if (typeof body.id !== 'string' || !body.id) throw new Error('Invalid ID');
+      const count = sheet.getLastRow();
+      const ids = count > 1 ? sheet.getRange(2, 1, count - 1, 1).getValues() : [];
+      const index = ids.findIndex(row => String(row[0]) === body.id);
+      if (index >= 0) sheet.getRange(index + 2, 1, 1, 8).clearContent();
+      SpreadsheetApp.flush();
+      return reply({status: 'ok', id: body.id});
+    }
+    if (!Array.isArray(body.values) || body.values.length !== 8 ||
+        typeof body.values[0] !== 'string' || !body.values[0]) throw new Error('Invalid values');
     // Upsert by immutable expense ID, even after a user sorts the sheet.
     const count = sheet.getLastRow();
     const ids = count > 1 ? sheet.getRange(2, 1, count - 1, 1).getValues() : [];

@@ -17,6 +17,8 @@ class Inspection:
     reason: str
     text: str = ""
     images: list[bytes] = field(default_factory=list)
+    image_dimensions: list[tuple[int, int]] = field(default_factory=list)
+    pdf_chunks: list[tuple[int, int, bytes]] = field(default_factory=list)
 
 
 def inspect(data: bytes, max_bytes: int, max_pages: int) -> Inspection:
@@ -29,7 +31,7 @@ def inspect(data: bytes, max_bytes: int, max_pages: int) -> Inspection:
                     raise FileRejected("Encrypted PDFs are not supported")
                 if not 1 <= len(pdf) <= max_pages:
                     raise FileRejected("PDF exceeds the configured page limit")
-                texts, uncertain, images = [], [], []
+                texts, uncertain, images, image_dimensions = [], [], [], []
                 for page in pdf:
                     text = page.get_text().strip()
                     texts.append(text)
@@ -42,13 +44,28 @@ def inspect(data: bytes, max_bytes: int, max_pages: int) -> Inspection:
                         or bool(list(page.annots() or []))
                     )
                     uncertain.append(suspicious)
-                if any(uncertain):
-                    # Include every page so visual totals retain their textual context.
-                    for page in pdf:
-                        scale = min(2, 1600 / max(page.rect.width, page.rect.height))
-                        images.append(
-                            page.get_pixmap(matrix=pymupdf.Matrix(scale, scale)).tobytes("png")
-                        )
+                # Always provide every PDF page as an image as well as its text.
+                # This covers image-only scans and lets vision verify small totals,
+                # dates, and layout-dependent labels even when a text layer exists.
+                for page in pdf:
+                    scale = min(2, 1200 / max(page.rect.width, page.rect.height))
+                    pixmap = page.get_pixmap(matrix=pymupdf.Matrix(scale, scale), alpha=False)
+                    images.append(pixmap.tobytes("png"))
+                    image_dimensions.append((pixmap.width, pixmap.height))
+                pdf_chunks = []
+                chunk_size = 3
+                for start in range(0, len(pdf), chunk_size):
+                    end = min(start + chunk_size, len(pdf))
+                    if start == 0 and end == len(pdf):
+                        chunk_bytes = data
+                    else:
+                        chunk = pymupdf.open()
+                        try:
+                            chunk.insert_pdf(pdf, from_page=start, to_page=end - 1)
+                            chunk_bytes = chunk.tobytes(garbage=4, deflate=True)
+                        finally:
+                            chunk.close()
+                    pdf_chunks.append((start + 1, end, chunk_bytes))
                 route = (
                     "text"
                     if not any(uncertain)
@@ -58,11 +75,13 @@ def inspect(data: bytes, max_bytes: int, max_pages: int) -> Inspection:
                     "application/pdf",
                     len(pdf),
                     route,
-                    "All pages have usable text and no detected visual ambiguity"
+                    "All PDF pages are supplied as images alongside extracted text"
                     if route == "text"
-                    else "Sparse text, images, drawings or annotations require visual review",
+                    else "All PDF pages are supplied as images alongside any extracted text",
                     "\n\n".join(texts),
                     images,
+                    image_dimensions,
+                    pdf_chunks,
                 )
         except FileRejected:
             raise
@@ -76,16 +95,18 @@ def inspect(data: bytes, max_bytes: int, max_pages: int) -> Inspection:
                 raise FileRejected("Image exceeds the pixel limit")
             image.verify()
         with Image.open(BytesIO(data)) as image:
+            image_format = image.format
             image = image.convert("RGB")
             image.thumbnail((1600, 1600))
             output = BytesIO()
             image.save(output, format="PNG")
         return Inspection(
-            Image.MIME.get(Image.open(BytesIO(data)).format, "image/png"),
+            Image.MIME.get(image_format, "image/png"),
             1,
             "vision",
             "Image requires multimodal extraction",
             images=[output.getvalue()],
+            image_dimensions=[(image.width, image.height)],
         )
     except FileRejected:
         raise

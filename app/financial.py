@@ -57,8 +57,18 @@ def validate(candidate: Candidate):
         candidate.grand_total is not None and candidate.grand_total < 0
     ):
         raise Conflict("Refunds and credit notes are outside this prototype's scope")
-    if candidate.grand_total is None or candidate.grand_total == 0:
-        issue("MISSING_GRAND_TOTAL", "blocking", "grand_total", "Provide a positive explicit total")
+    if candidate.grand_total is None:
+        issue("MISSING_GRAND_TOTAL", "blocking", "grand_total", "Provide an explicit invoice total")
+    elif candidate.grand_total == 0:
+        issue(
+            "ZERO_AMOUNT_DUE",
+            "review",
+            "grand_total",
+            (
+                "The invoice explicitly reports zero payable. Confirm whether it should be "
+                "recorded as a zero-value expense."
+            ),
+        )
     if candidate.currency is None:
         issue("MISSING_CURRENCY", "blocking", "currency", "Provide the document currency")
     for name in ("subtotal", "tax", "discount"):
@@ -70,6 +80,9 @@ def validate(candidate: Candidate):
         candidate.subtotal is not None
         and candidate.grand_total is not None
         and candidate.tax_mode in {"inclusive", "exclusive"}
+        # A separately stated amount due can include account balances, credits, or
+        # adjustments that are not represented by the subtotal/tax/discount fields.
+        and candidate.amount_due is None
     ):
         expected = candidate.subtotal
         if candidate.tax_mode == "exclusive":
@@ -641,6 +654,13 @@ def sync_sheets(session, settings, expense_id, transport=None):
     session.commit()
     return delivery
 
+
+def clear_sheet_delivery(settings, delivery, expense_id):
+    try:
+        Sheets(settings).remove(delivery.row_number, expense_id)
+    except (IntegrationError, OSError, httpx.HTTPError) as exc:
+        raise IntegrationError("SHEETS_DELETE_FAILED") from exc
+
 def create_category(session, name, definition, id=None, active=True, actor="reviewer"):
     cat_id = (id or "").strip()
     if not cat_id:
@@ -657,12 +677,14 @@ def create_category(session, name, definition, id=None, active=True, actor="revi
     return category
 
 
-def delete_expense(session, expense_id, actor="reviewer"):
+def delete_expense(session, expense_id, actor="reviewer", settings=None):
     expense = session.get(Expense, expense_id)
     if not expense:
         return False
     doc_id = expense.document_id
     deliveries = session.scalars(select(Delivery).where(Delivery.expense_id == expense.id)).all()
+    if settings and deliveries:
+        clear_sheet_delivery(settings, deliveries[0], expense.id)
     for delivery in deliveries:
         session.delete(delivery)
     session.flush()
@@ -689,8 +711,14 @@ def delete_document(session, settings, document_id, actor="reviewer"):
     doc = session.get(Document, document_id)
     if not doc:
         return False
+    # Clear all external sheet rows first; keep the database intact if a clear fails.
+    expenses = session.scalars(select(Expense).where(Expense.document_id == doc.id)).all()
+    for exp in expenses:
+        deliveries = session.scalars(select(Delivery).where(Delivery.expense_id == exp.id)).all()
+        for deliv in deliveries:
+            clear_sheet_delivery(settings, deliv, exp.id)
     # 1. Delete associated deliveries and expenses
-    for exp in session.scalars(select(Expense).where(Expense.document_id == doc.id)).all():
+    for exp in expenses:
         for deliv in session.scalars(select(Delivery).where(Delivery.expense_id == exp.id)).all():
             session.delete(deliv)
         session.flush()

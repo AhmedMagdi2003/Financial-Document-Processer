@@ -144,6 +144,52 @@ class Sheets:
         if response.is_error:
             raise IntegrationError(f"SHEETS_HTTP_{response.status_code}")
 
+    def remove(self, row, expense_id):
+        """Clear the spreadsheet entry before its database delivery mapping is removed."""
+        if not self.configured:
+            return
+        webhook_url = getattr(self.settings, "sheets_webhook_url", "")
+        if webhook_url:
+            secret = self.settings.sheets_webhook_secret.get_secret_value()
+            if len(secret) < 24:
+                raise IntegrationError("SHEETS_WEBHOOK_SECRET_REQUIRED")
+            if not webhook_url.startswith("https://"):
+                raise IntegrationError("SHEETS_WEBHOOK_HTTPS_REQUIRED")
+            with httpx.Client(transport=self.transport, timeout=30) as client:
+                response = client.post(webhook_url, json={
+                    "secret": secret, "action": "delete", "id": expense_id,
+                })
+                if response.status_code in (302, 303):
+                    location = response.headers.get("location", "")
+                    target = httpx.URL(location)
+                    if target.scheme != "https" or target.host != "script.googleusercontent.com":
+                        raise IntegrationError("SHEETS_WEBHOOK_INVALID_REDIRECT")
+                    response = client.get(location)
+            if response.is_error:
+                raise IntegrationError(f"SHEETS_WEBHOOK_HTTP_{response.status_code}")
+            try:
+                ack = response.json()
+            except ValueError:
+                raise IntegrationError("SHEETS_WEBHOOK_INVALID_RESPONSE") from None
+            if (
+                not isinstance(ack, dict)
+                or ack.get("status") != "ok"
+                or ack.get("id") != expense_id
+            ):
+                raise IntegrationError("SHEETS_WEBHOOK_NOT_ACKNOWLEDGED")
+            return
+
+        sheet_id = quote(self.settings.sheets_spreadsheet_id, safe="")
+        token = self.settings.sheets_access_token.get_secret_value()
+        with httpx.Client(transport=self.transport, timeout=15) as client:
+            response = client.post(
+                f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/Expenses!A{row}:H{row}:clear",
+                json={},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        if response.is_error:
+            raise IntegrationError(f"SHEETS_HTTP_{response.status_code}")
+
 
 def safe_filename(value):
     return Path(value.replace("\\", "/")).name[:250] or "document"

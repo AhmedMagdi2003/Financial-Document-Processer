@@ -708,14 +708,27 @@ def create_app(settings=None, engine=None):
 
     @application.delete("/api/v1/expenses/{expense_id}")
     def delete_expense(expense_id: str, session: DB, actor: Actor):
-        success = financial.delete_expense(session, expense_id, actor)
+        try:
+            success = financial.delete_expense(session, expense_id, actor, settings=cfg)
+        except IntegrationError as exc:
+            raise HTTPException(
+                502,
+                "Could not remove this record from Google Sheets; the database record was kept.",
+            ) from exc
         if not success:
             raise HTTPException(404, "Expense record not found")
         return {"status": "deleted", "id": expense_id}
 
     @application.delete("/api/v1/documents/{document_id}")
     def delete_document(document_id: str, session: DB, actor: Actor):
-        success = financial.delete_document(session, cfg, document_id, actor)
+        try:
+            success = financial.delete_document(session, cfg, document_id, actor)
+        except IntegrationError as exc:
+            raise HTTPException(
+                502,
+                "Could not remove all associated records from Google Sheets; "
+                "the database records were kept.",
+            ) from exc
         if not success:
             raise HTTPException(404, "Document not found")
         return {"status": "deleted", "id": document_id}

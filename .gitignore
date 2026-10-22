@@ -72,6 +72,11 @@ node_modules/
 /tmp/
 /temp/
 /recordings/
+/demo/raw_recordings/*.webm
+/demo/raw_recordings/*
+!/demo/raw_recordings/.gitkeep
+/demo/output/*
+!/demo/output/.gitkeep
 .DS_Store
 Thumbs.db
 

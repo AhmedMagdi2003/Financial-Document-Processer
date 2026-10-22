@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     max_file_bytes: int = 10 * 1024 * 1024
     max_pages: int = 8
     provider_timeout: int = 120
-    max_llm_calls: int = 3
+    max_llm_calls: int = 7
     max_job_cost_usd: str = "0.10"
     input_usd_per_million: str = ""
     output_usd_per_million: str = ""
@@ -59,8 +59,8 @@ class Settings(BaseSettings):
             raise ValueError("Fixture provider is restricted to explicit demo mode")
         if self.database_url.get_secret_value().startswith("sqlite") and self.mode != "demo":
             raise ValueError("SQLite is restricted to explicit offline demo mode")
-        if not 1 <= self.max_llm_calls <= 3:
-            raise ValueError("max_llm_calls must be 1..3")
+        if not 1 <= self.max_llm_calls <= 7:
+            raise ValueError("max_llm_calls must be 1..7")
         return self
 
     def require_runtime(self):

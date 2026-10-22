@@ -1,5 +1,9 @@
 # Google Sheets, Google Drive, and Zapier
 
+## Reporting currency and exchange rates
+
+The finance dashboard has a reporting-currency selector in the application-wide top bar (USD, EUR, or EGP). It converts confirmed totals, category/timeline summaries, and each listed expense into the selected currency, while showing original amounts and a breakdown by source currency. The exchange-rate panel shows the relevant currency pairs and the provider's update timestamp/date. Rates come from the free, keyless [ExchangeRate-API Open Access endpoint](https://www.exchangerate-api.com/docs/free), with a short application cache. This display is for reporting only: it does not rewrite invoice values, stored expenses, or accounting entries. The authenticated `GET /api/v1/exchange-rates?base=EGP&symbols=USD,EUR` endpoint supplies the rates.
+
 The finance service accepts PDFs, JPEGs, PNGs and WebP files at `POST /api/v1/documents`. The multipart fields are `file`, `project_id` (an existing project ID, not its display name) and optional `auto_record=true`. Authenticate with `Authorization: Bearer <REVIEWER_TOKEN>`. Get project IDs from authenticated `GET /api/v1/projects`.
 
 Google and Zapier run outside your computer. Deploy the finance server at a reachable HTTPS URL with a valid certificate. `localhost` and private LAN addresses do not work. Keep your API token in Script Properties or private Zap configuration; do not put it in a spreadsheet or shared source. The token grants reviewer access, so restrict script editors.
@@ -17,7 +21,9 @@ SHEETS_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT/exec
 SHEETS_WEBHOOK_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_24_CHARACTERS
 ```
 
-The receiver locks concurrent writes, finds an existing expense ID and updates that row; retries do not append duplicates. It escapes formula-like document text and writes amounts as numbers. Keep the ID column intact. Only this database should write expenses into this tab. Recording is independent of delivery: a Google error leaves the expense recorded and its delivery failed. Retry with authenticated `POST /api/v1/expenses/{expense_id}/sync` (three attempts maximum).
+The receiver locks concurrent writes, finds an existing expense ID and updates that row; retries do not append duplicates. It escapes formula-like document text and writes amounts as numbers. Deleting an expense or document also clears the matching spreadsheet row by immutable ID (or its reserved row in Sheets API mode); a spreadsheet error prevents the database deletion so the two stores do not silently drift. Keep the ID column intact. Only this database should write expenses into this tab. Retry failed writes with authenticated `POST /api/v1/expenses/{expense_id}/sync` (three attempts maximum).
+
+If you already deployed the Apps Script webhook, paste the current `scripts/google_apps_script/SheetsWebhook.gs` into the Apps Script editor and update the existing deployment to a new version so it accepts deletion actions.
 
 The backend accepts only a JSON acknowledgement with `status: "ok"` and the matching expense ID. A sign-in page or HTTP 200 error response is a failed delivery. Google ContentService redirects to a one-time `script.googleusercontent.com` URL; the backend retrieves that response without resending the secret. See [Google ContentService](https://developers.google.com/apps-script/guides/content).
 
@@ -36,7 +42,7 @@ Use a separate Apps Script project and paste `scripts/google_apps_script/DriveIn
 | `AUTO_RECORD` | `true` to automatically record valid documents; otherwise `false` |
 | `MAX_FILE_BYTES` | Optional; defaults to 10485760 and must not exceed server limit |
 
-Run `processNewInvoices` once and authorize Google access. Then run `installDriveTrigger` once to schedule polling every five minutes. Upload a sample invoice into the folder and inspect Apps Script Executions plus the finance review queue. The authorized script account must be able to read the folder. The poller scans direct files, not nested folders; Google-native Docs/Sheets are excluded. Use one script per folder/project mapping.
+Run `processNewInvoices` once and authorize Google access. Then run `installDriveTrigger` once to schedule polling every one minute. Upload a sample invoice into the folder and inspect Apps Script Executions plus the finance review queue. The authorized script account must be able to read the folder. The poller scans direct files, not nested folders; Google-native Docs/Sheets are excluded. Use one script per folder/project mapping.
 
 The script sends each blob as multipart data and assigns a stable idempotency key to the project, Drive file ID and modification timestamp. It saves the returned document ID in Script Properties and polls its state. HTTP success alone is never counted as a recorded invoice:
 

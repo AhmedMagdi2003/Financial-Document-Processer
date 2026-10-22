@@ -7,7 +7,7 @@
       "version": 1,
       "parameters": {
         "select": "folder",
-        "folderId": "1p9CN6bctZzHetn2lnYC0Ju6ipp6EBvIg",
+        "folderId": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
         "limit": 10
       },
       "mapper": {},
@@ -44,12 +44,12 @@
         "useCustomHeaders": true
       },
       "mapper": {
-        "url": "https://uncross-verbally-evidence.ngrok-free.dev/api/v1/documents",
+        "url": "https://YOUR_PUBLIC_FINANCE_HOST/api/v1/documents",
         "method": "POST",
         "headers": [
           {
             "name": "Authorization",
-            "value": "tok_ahmed_magdi_TNOW-swIAYIlF2w3oNiMdXFn5vdgxy7r"
+            "value": "Bearer YOUR_REVIEWER_TOKEN"
           },
           {
             "name": "ngrok-skip-browser-warning",

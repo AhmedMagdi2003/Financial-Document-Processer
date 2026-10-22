@@ -62,10 +62,38 @@ def exact_money(value):
 Money = Annotated[Decimal, BeforeValidator(exact_money)]
 
 
+def clean_quantity_value(value):
+    """Normalize a measured quantity without applying money rounding rules."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float, Decimal)):
+        return str(value)
+    if isinstance(value, str):
+        return clean_money_value(value)
+    return str(value)
+
+
+def exact_quantity(value):
+    if value is not None:
+        value = clean_quantity_value(value)
+        try:
+            number = Decimal(value)
+        except (InvalidOperation, TypeError) as exc:
+            raise ValueError("Invalid decimal quantity") from exc
+        if not number.is_finite() or abs(number) >= Decimal("1000000000000000"):
+            raise ValueError("Invalid or out-of-range quantity")
+        if max(0, -number.as_tuple().exponent) > 12:
+            raise ValueError("Maximum twelve fractional digits")
+    return value
+
+
+Quantity = Annotated[Decimal, BeforeValidator(exact_quantity)]
+
+
 class Item(BaseModel):
     model_config = ConfigDict(extra="forbid")
     description: str = Field(max_length=1000)
-    quantity: Money | None = None
+    quantity: Quantity | None = None
     unit_price: Money | None = None
     line_amount: Money | None = None
 
