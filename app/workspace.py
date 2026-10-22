@@ -95,7 +95,12 @@ def install_workspace_routes(app, cfg, db, authenticated, render):
 
     @app.get("/api/v1/integrations/scripts/{filename}")
     def integration_script(filename: str, actor: Actor):
-        if filename not in {"SheetsWebhook.gs", "DriveIngestion.gs", "google_drive_to_finance_blueprint.json"}:
+        allowed_scripts = {
+            "SheetsWebhook.gs",
+            "DriveIngestion.gs",
+            "google_drive_to_finance_blueprint.json",
+        }
+        if filename not in allowed_scripts:
             raise HTTPException(404)
         if filename == "google_drive_to_finance_blueprint.json":
             return FileResponse(

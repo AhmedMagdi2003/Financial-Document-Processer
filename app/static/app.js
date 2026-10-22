@@ -383,8 +383,33 @@ function initFinanceCharts() {
       const catValues = summary.categories.map(c => parseFloat(c.total) || 0);
       const colors = ['#1e6255', '#2563eb', '#0d9488', '#d97706', '#16a34a', '#8b5cf6', '#ec4899', '#64748b'];
 
+      // Custom plugin to draw numbers directly on pie/doughnut slices
+      const pieSliceLabels = {
+        id: 'pieSliceLabels',
+        afterDatasetsDraw(chart) {
+          const { ctx, data } = chart;
+          const total = data.datasets[0].data.reduce((a, b) => a + Number(b), 0);
+          chart.getDatasetMeta(0).data.forEach((element, index) => {
+            const val = Number(data.datasets[0].data[index]) || 0;
+            if (val <= 0) return;
+            const pct = total > 0 ? ((val / total) * 100).toFixed(0) + '%' : '';
+            const pos = element.tooltipPosition();
+            ctx.save();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+            ctx.shadowBlur = 3;
+            ctx.fillText(`${val.toFixed(1)} (${pct})`, pos.x, pos.y);
+            ctx.restore();
+          });
+        }
+      };
+
       new Chart(catEl, {
         type: 'doughnut',
+        plugins: [pieSliceLabels],
         data: {
           labels: catLabels.length ? catLabels : ['Uncategorized'],
           datasets: [{
@@ -400,7 +425,28 @@ function initFinanceCharts() {
           plugins: {
             legend: {
               position: 'right',
-              labels: { boxWidth: 12, color: '#173c39', font: { size: 12 } },
+              labels: {
+                boxWidth: 12,
+                color: '#173c39',
+                font: { size: 12 },
+                generateLabels(chart) {
+                  const data = chart.data;
+                  if (data.labels.length && data.datasets.length) {
+                    const total = data.datasets[0].data.reduce((a, b) => a + Number(b), 0);
+                    return data.labels.map((label, i) => {
+                      const val = Number(data.datasets[0].data[i]) || 0;
+                      const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                      return {
+                        text: `${label}: ${val.toFixed(2)} (${pct}%)`,
+                        fillStyle: data.datasets[0].backgroundColor[i],
+                        hidden: isNaN(data.datasets[0].data[i]),
+                        index: i,
+                      };
+                    });
+                  }
+                  return [];
+                },
+              },
             },
             tooltip: {
               callbacks: {
@@ -459,8 +505,62 @@ function initFinanceCharts() {
   }
 }
 
+
+// Interactive client-side table sorting
+function initTableSorting() {
+  const table = document.querySelector('#expense-table');
+  if (!table) return;
+
+  const headers = table.querySelectorAll('.sortable-th');
+  let currentSort = { column: null, ascending: true };
+
+  headers.forEach(th => {
+    th.addEventListener('click', () => {
+      const sortKey = th.dataset.sort;
+      const isAscending = currentSort.column === sortKey ? !currentSort.ascending : false;
+      currentSort = { column: sortKey, ascending: isAscending };
+
+      // Update header indicators
+      headers.forEach(h => {
+        const ind = h.querySelector('.sort-indicator');
+        if (ind) ind.textContent = '⇅';
+      });
+      const activeIndicator = th.querySelector('.sort-indicator');
+      if (activeIndicator) activeIndicator.textContent = isAscending ? '▲' : '▼';
+
+      const tbody = table.querySelector('#expense-table-body');
+      const rows = Array.from(tbody.querySelectorAll('tr[id^="expense-row-"]'));
+
+      rows.sort((a, b) => {
+        let valA = a.dataset[camelCase(sortKey)] || '';
+        let valB = b.dataset[camelCase(sortKey)] || '';
+
+        if (sortKey === 'amount') {
+          valA = parseFloat(valA) || 0;
+          valB = parseFloat(valB) || 0;
+          return isAscending ? valA - valB : valB - valA;
+        }
+
+        const comp = valA.localeCompare(valB);
+        return isAscending ? comp : -comp;
+      });
+
+      rows.forEach(r => tbody.appendChild(r));
+    });
+  });
+}
+
+function camelCase(str) {
+  return str.replace(/-([a-z])/g, g => g[1].toUpperCase());
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initFinanceCharts);
+  document.addEventListener('DOMContentLoaded', () => {
+    initFinanceCharts();
+    initTableSorting();
+  });
 } else {
   initFinanceCharts();
+  initTableSorting();
 }
+

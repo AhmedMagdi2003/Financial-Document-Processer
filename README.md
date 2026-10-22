@@ -1,26 +1,93 @@
 # Financial Document Assistant
 
-An automated financial operations assistant designed for expense tracking, receipt/invoice inspection, structured extraction, multi-layered deterministic validation, and confirmed record tracking with Supabase PostgreSQL.
+An automated, production-grade financial operations platform designed for multi-format receipt and invoice ingestion, multimodal AI vision extraction, deterministic mathematical and policy validation, autonomous recording gates, multi-user audit logging, and bi-directional cloud integrations (Google Sheets, Google Drive, Make.com).
 
 ---
 
-## Features
+## Architecture Overview
 
-- **Document Ingestion**: Accepts PDF, PNG, JPEG, and WEBP formats with MIME validation and page limits.
-- **Smart PDF Routing**: Inspects PDF layout with PyMuPDF; routes text-based documents directly and visual/mixed documents through multimodal processing.
-- **Automated Processing**: End-to-end automated pipeline (`Document received → Automatic extraction → Validation → Categorization → Duplicate detection → Automatic recording if valid → Google Sheets sync`).
-- **Deterministic Review Gates**: Zero-human-intervention for valid documents. Human intervention is strictly quarantined to 4 critical review conditions:
-  1. `MISSING_GRAND_TOTAL`: Grand total could not be determined.
-  2. `MISSING_CURRENCY`: Currency could not be determined or is ambiguous.
-  3. `POSSIBLE_DUPLICATE`: Vendor, date, amount, or hash matches an existing record.
-  4. `TOTAL_INCONSISTENCY`: Subtotal + tax - discount does not equal the grand total.
-- **Nonblocking Warnings**: Non-critical warnings (e.g., missing invoice number on a receipt, missing payment method, unlisted category) are attached to the recorded expense without blocking auto-recording.
-- **Batch Upload & Sequential Processing**: Select multiple files simultaneously; a resilient in-process queue processes documents one-by-one with real-time UI progress, status badges, and failure isolation.
-- **Human-Friendly Error Handling**: Structured error taxonomy mapping technical provider failures, unreadable files, and validation warnings into actionable guidance without leaking stack traces or credentials.
-- **Review Queue**: Dedicated interface for nontechnical operators to review, edit, revalidate, re-extract, confirm, or dismiss flagged candidates.
-- **Confirmed Expense Tracker**: Multi-currency spend summaries, date/project/category filters, and CSV export.
-- **Authoritative Persistence**: Backed by Supabase PostgreSQL with Row Level Security (RLS) enabled.
-- **Google Sheets & Drive Integrations**: Automatic outbound sync via Google Sheets API v4 or a 100% free Google Apps Script webhook (see [Integration Guide](docs/INTEGRATION_GUIDE.md)).
+```mermaid
+flowchart TD
+    subgraph Ingestion["1. Multi-Channel Ingestion Layer"]
+        UI["Web Dropzone & Batch Upload\n(/, /api/v1/batch-upload)"]
+        GDrive["Google Drive Ingestion\n(Apps Script 1-min / Make.com Webhook)"]
+        REST["Direct REST API\n(POST /api/v1/documents)"]
+    end
+
+    subgraph Routing["2. Routing & Multimodal AI Extraction"]
+        Router{"PyMuPDF Router\nText vs Visual?"}
+        TextPDF["Direct PDF Text Extraction"]
+        VisionAI["Multimodal AI Vision & OCR\n(GPT-4o-mini / Gemini 2.0 Flash)"]
+        Structured["Strict Pydantic Candidate Schema\n(Vendor, Date, Amounts, Line Items, Tax, Currency)"]
+    end
+
+    subgraph Validation["3. Deterministic Validation Engine"]
+        MathCheck{"Arithmetic Check\nSubtotal + Tax - Discount == Grand Total"}
+        FieldCheck{"Required Field Check\nGrand Total & Currency Present?"}
+        DupCheck{"Duplicate Detector\nVendor + Date + Amount + Digest Hash"}
+        CatCheck["Auto-Categorization & Policy Tagging"]
+    end
+
+    subgraph Decision["4. Autonomous Routing Gate"]
+        Gate{"Critical Issues == 0\n& AUTO_RECORD == True?"}
+        AutoRecord["State: RECORDED\nAuto-record into confirmed expenses"]
+        Quarantine["State: NEEDS_REVIEW\nQuarantine in Review Queue"]
+    end
+
+    subgraph Review["5. Human Review & Multi-User Audit"]
+        ReviewQueue["Web Review Queue\n(/review, /documents/{id})"]
+        AuditTrail["Audit Log & Token Attribution\n(Actor: Sarah Connor / Ahmed Ali)"]
+        Resolution["Manual Edit / Re-extract / Confirm / Dismiss"]
+    end
+
+    subgraph Delivery["6. Downstream Delivery & Storage"]
+        SheetsSync["Google Sheets Webhook Sync\n(100% Free Apps Script)"]
+        Postgres[("Supabase PostgreSQL\n(Row Level Security Enabled)")]
+        Storage[("Supabase Originals Bucket\n(PDFs & Raw Images)")]
+    end
+
+    Ingestion --> Router
+    Router -- "Digital Text" --> TextPDF --> Structured
+    Router -- "Scanned/Image" --> VisionAI --> Structured
+
+    Structured --> MathCheck & FieldCheck & DupCheck --> CatCheck
+
+    CatCheck --> Gate
+    Gate -- "Pass" --> AutoRecord
+    Gate -- "Flagged" --> Quarantine
+
+    Quarantine --> ReviewQueue --> Resolution --> AutoRecord
+    Resolution -.-> AuditTrail
+
+    AutoRecord --> Postgres
+    AutoRecord --> SheetsSync
+    AutoRecord --> Storage
+```
+
+---
+
+## Key Features
+
+1. **Autonomous Processing with Strict Safety Gates**:
+   - Clean, valid invoices automatically process from ingestion to confirmed expense records and Google Sheets sync with **zero manual friction**.
+   - Human review is strictly quarantined to **4 non-negotiable safety conditions**:
+     - `MISSING_GRAND_TOTAL`: Grand total could not be determined.
+     - `MISSING_CURRENCY`: Currency could not be determined or is ambiguous.
+     - `POSSIBLE_DUPLICATE`: Matches an existing document by vendor, date, amount, or file digest.
+     - `TOTAL_INCONSISTENCY`: Subtotal + tax - discount does not equal the grand total.
+2. **Multi-User Access Tokens & Action Attribution**:
+   - Issue distinct access tokens tied to team members (e.g. `Ahmed Ali`, `Sarah Connor`).
+   - Every action—uploading documents, editing line items, approving expenses, modifying categories, or deleting records—is permanently recorded in the audit log with the user's name.
+3. **Multi-Format Ingestion**:
+   - Supports PDF, PNG, JPEG, and WEBP.
+   - Batch upload interface processes documents sequentially in an isolated queue with live visual progress.
+4. **Enhanced Data Visualizations**:
+   - Dynamic Doughnut/Pie chart with exact dollar amounts and percentages rendered directly on each slice.
+   - Interactive, instant table sorting by **Invoice Date**, **Date Added to Project**, **Vendor**, and **Amount**.
+5. **No-Paywall Cloud Automations**:
+   - **Google Drive**: Background Apps Script polling every **1 minute** + instant one-click sync, plus ready-to-use Make.com scenario blueprint.
+   - **Google Sheets**: Free bidirectional webhook integration updating spreadsheet rows without Google API quota limits or Zapier subscription fees.
+   - **Tunnel & Hosting Switcher**: Built-in switcher between **Render** and **ngrok** via `.env`.
 
 ---
 
@@ -29,8 +96,9 @@ An automated financial operations assistant designed for expense tracking, recei
 ### Prerequisites
 - Python 3.12 or 3.13
 - [`uv`](https://docs.astral.sh/uv/) package manager
+- A Supabase PostgreSQL database (or compatible PostgreSQL instance)
 
-### 1. Clone & Install Dependencies
+### 1. Install Dependencies
 ```powershell
 uv sync --locked
 ```
@@ -42,7 +110,7 @@ Copy-Item .env.example .env
 ```
 
 ### 3. Initialize Database Schema
-Run the database setup script to create tables, default fictional projects (`river`, `skills`), and core expense categories:
+Run the database setup script to create tables, default projects (`river`, `skills`), default categories, and admin tokens:
 ```powershell
 uv run python -m scripts.setup_db
 ```
@@ -52,75 +120,152 @@ uv run python -m scripts.setup_db
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 Open [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browser.  
-Sign in using the `REVIEWER_TOKEN` configured in your `.env` file.
+Sign in using your reviewer access token.
 
 ---
 
-## Environment Variables Reference
+## How to Create and Manage Projects (Like `river`)
 
-All application settings are managed in `.env` and typed via Pydantic Settings.
+Projects isolate budgets, expense records, categories, and documents. The system comes pre-seeded with project `river` and `skills`. Here is how you create new projects:
 
-| Variable | Type | Allowed Values / Format | Default | Description |
-|---|---|---|---|---|
-| `MODE` | string | `cloud`, `demo` | `cloud` | Operational mode. Set to `cloud` for Supabase PostgreSQL. `demo` allows local offline SQLite storage. |
-| `DATABASE_URL` | string | `postgresql+psycopg://...` or `sqlite://...` | *Required* | Authoritative database connection string. For Supabase, use the pooled PostgreSQL URL with the `postgresql+psycopg://` driver scheme. |
-| `REVIEWER_TOKEN` | string | String (min 24 characters) | *Required* | Secret token used by reviewers to log into the web dashboard and for Bearer token API authorization. |
-| `SESSION_SECRET` | string | String (min 24 characters) | *Required* | Secret key used to sign HTTP session cookies. |
-| `SECURE_COOKIES` | boolean | `true`, `false` | `false` (local) / `true` (prod) | Whether to enforce `Secure` flag on session cookies (set `true` when hosted behind HTTPS). |
-| `LOCAL_DATA_DIR` | path | Directory path | `data` | Local directory for storing temporary files, cache, and uploaded originals when cloud storage is not configured. |
-| `SUPABASE_URL` | string | `https://<project-ref>.supabase.co` | Optional | Supabase project URL. Required if using Supabase Storage buckets. |
-| `SUPABASE_SERVICE_KEY` | string | Supabase Service Role JWT | Optional | Privileged server-side service key for Supabase Storage uploads. |
-| `STORAGE_BUCKET` | string | Bucket name | `originals` | Private Supabase Storage bucket name for original files. |
-| `PROVIDER` | string | `none`, `gemini`, `openai`, `xai`, `fixture` | `none` | AI extraction model provider. Select `gemini` for Google GenAI, `openai` for OpenAI, `xai` for Grok, or `none` / `fixture` for offline fixture replay. |
-| `MODEL_NAME` | string | Model identifier | e.g. `gemini-2.0-flash` | The specific model name to query (e.g., `gemini-2.0-flash`, `gpt-4o-mini`). |
-| `GOOGLE_API_KEY` | string | API key string | Optional | Google AI API key (required if `PROVIDER=gemini`). |
-| `OPENAI_API_KEY` | string | API key string | Optional | OpenAI API key (required if `PROVIDER=openai`). |
-| `XAI_API_KEY` | string | API key string | Optional | xAI API key (required if `PROVIDER=xai`). |
-| `PROVIDER_TIMEOUT` | integer | Seconds | `45` | Timeout in seconds for LLM provider API requests. |
-| `MAX_LLM_CALLS` | integer | `1`, `2`, `3` | `3` | Hard ceiling on automated LLM calls per document processing job. |
-| `MAX_JOB_COST_USD` | decimal string | Numeric string (e.g. `0.10`) | `0.10` | Hard cost budget per document job. |
-| `MAX_INPUT_TOKENS` | integer | Number of tokens | `32000` | Maximum context input tokens permitted per call. |
-| `INPUT_USD_PER_MILLION` | decimal string | Rate in USD | e.g. `0.10` | Provider pricing rate per 1M input tokens for internal cost accounting. |
-| `OUTPUT_USD_PER_MILLION`| decimal string | Rate in USD | e.g. `0.40` | Provider pricing rate per 1M output tokens for internal cost accounting. |
-| `PRICING_SOURCE_URL` | string | URL string | e.g. `https://ai.google.dev/pricing` | Documented source URL for token pricing provenance. |
-| `PRICING_CHECKED_AT` | string | Date string (`YYYY-MM-DD`) | e.g. `2026-10-21` | Date when the pricing rates were verified. |
-| `AUTO_RECORD` | boolean | `true`, `false` | `false` | When `true`, documents with 0 critical review issues are recorded into confirmed expenses automatically. |
-| `SHEETS_WEBHOOK_URL` | string | URL string | Optional | Google Apps Script Web App URL for 100% free outbound Google Sheets sync. |
-| `SHEETS_SPREADSHEET_ID`| string | Google Spreadsheet ID | Optional | Target Google Spreadsheet ID for Google Sheets API v4 outbound expense sync. |
-| `SHEETS_ACCESS_TOKEN` | string | OAuth Bearer token | Optional | Access token with Google Sheets API v4 edit permissions. |
-| `TRACING_BACKENDS` | string | `none`, `langfuse`, `langsmith`, `both` | `none` | External LLM observability export. Keep `none` to use internal database audit feed without cloud tracing. |
+### Method A: Through the Web Interface (Recommended)
+1. In the left navigation sidebar, click **Projects** (`/projects`).
+2. Under **Create a project**, fill in:
+   - **Project name**: The human-readable title (e.g., `Solar Microgrid Initiative` or `Community Water Fund`).
+   - **Permanent project ID**: Lowercase alphanumeric slug with hyphens or underscores (e.g., `solar-microgrid` or `community-water`).
+3. Click **Create project**.
+4. The project is immediately available in the upload dropzone, review filters, and expense tracker.
 
----
-
-## API Endpoints
-
-All endpoints under `/api/v1` require `Authorization: Bearer <REVIEWER_TOKEN>`.
-
-- `POST /api/v1/documents`: Upload and inspect a receipt/invoice document (multipart/form-data: `file`, `project_id`, optional `Idempotency-Key` header, optional `auto_record`).
-- `POST /api/v1/batch-upload`: Upload multiple files simultaneously for sequential queue execution (multipart/form-data: `files`, `project_id`, optional `auto_record`).
-- `GET /api/v1/documents/{id}`: Retrieve document extraction status, candidate fields, and review issues.
-- `PATCH /api/v1/documents/{id}/fields`: Correct or update candidate extraction fields before confirmation.
-- `POST /api/v1/documents/{id}/confirm`: Confirm and record an expense into the authoritative ledger.
-- `POST /api/v1/documents/{id}/dismiss`: Dismiss a rejected or invalid document submission with justification.
-- `POST /api/v1/documents/{id}/reextract`: Trigger a new bounded extraction attempt.
-- `GET /api/v1/expenses`: Query confirmed expenses with date, project, category, and currency filters.
-- `GET /api/v1/expenses/summary`: Currency-separated financial totals and category breakdown.
-- `GET /api/v1/expenses/export`: Download confirmed expenses as a CSV file.
-- `POST /api/v1/expenses/{id}/sync`: Sync confirmed expense row to Google Sheets.
-- `GET /api/v1/categories`: List available expense categories.
-- `PATCH /api/v1/categories/{id}`: Edit category definition or active status.
-- `GET /health`: Health and configuration check.
-
----
-
-## Testing & Quality
-
-Run tests:
-```powershell
-uv run pytest -q
+### Method B: Via Authenticated REST API
+Send an authenticated `POST` request to `/api/v1/projects`:
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/projects \
+  -H "Authorization: Bearer <YOUR_REVIEWER_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "solar-microgrid",
+    "name": "Solar Microgrid Initiative"
+  }'
+```
+Response (`201 Created`):
+```json
+{
+  "id": "solar-microgrid",
+  "name": "Solar Microgrid Initiative"
+}
 ```
 
-Run code formatting and linting:
-```powershell
-uv run ruff check .
+### Method C: Via Direct SQL (Supabase SQL Editor)
+```sql
+INSERT INTO projects (id, name, created_at)
+VALUES ('solar-microgrid', 'Solar Microgrid Initiative', NOW())
+ON CONFLICT (id) DO NOTHING;
 ```
+
+### Using Your New Project in Automations:
+- **Web UI Dropzone**: Select `Solar Microgrid Initiative` from the Project dropdown before dropping files.
+- **Google Drive Apps Script**: In `DriveIngestion.gs`, set Script Property `PROJECT_ID = "solar-microgrid"`.
+- **Make.com**: In the HTTP module multipart fields, set `project_id = "solar-microgrid"`.
+
+---
+
+## Team Access Tokens & User Attribution
+
+To allow team members to access the web app and attribute their actions in audit logs, manage tokens using [scripts/manage_tokens.py](file:///D:/ImpactCircles/Financial-Document-Processer/scripts/manage_tokens.py):
+
+```powershell
+# 1. Create a token for a team member
+uv run python scripts/manage_tokens.py create "Ahmed Ali" --role reviewer
+uv run python scripts/manage_tokens.py create "Sarah Connor" --role reviewer
+
+# 2. View all active team tokens
+uv run python scripts/manage_tokens.py list
+
+# 3. Revoke a token if a team member departs
+uv run python scripts/manage_tokens.py revoke <token_string>
+```
+
+When Sarah Connor signs in using her token (`tok_sarah_connor_...`):
+- Her web session is bound to `Sarah Connor`.
+- Every invoice upload, confirmation, line-item edit, or deletion stores `actor: "Sarah Connor"` in the audit timeline.
+
+---
+
+## Cloud & Automation Integrations
+
+### 1. Google Drive Ingestion (1-Minute Automated Polling + On-Demand)
+- Located at [scripts/google_apps_script/DriveIngestion.gs](file:///D:/ImpactCircles/Financial-Document-Processer/scripts/google_apps_script/DriveIngestion.gs).
+- Automated cloud trigger runs every **1 minute** via `installDriveTrigger()`.
+- Instant execution function `syncNow()` allows one-click runs from the Google Apps Script editor.
+- Automatically computes SHA-256 idempotency keys; duplicate files or repeated runs are completely safe.
+
+### 2. Make.com No-Code Scenario
+- Import the pre-configured blueprint from [scripts/make/google_drive_to_finance_blueprint.json](file:///D:/ImpactCircles/Financial-Document-Processer/scripts/make/google_drive_to_finance_blueprint.json).
+- Downloads files from Google Drive and streams them directly as multipart/form-data to `/api/v1/documents`.
+
+### 3. Google Sheets Outbound Sync
+- Located at [scripts/google_apps_script/SheetsWebhook.gs](file:///D:/ImpactCircles/Financial-Document-Processer/scripts/google_apps_script/SheetsWebhook.gs).
+- Automatically writes and updates expenses in your Google Sheet under the **Expenses** tab.
+- Handles retries, formula escaping, and currency values safely.
+
+### 4. Hosting & Tunnel Switcher (ngrok / Render)
+Switch public URLs by updating `HOSTING_PROVIDER` in `.env`:
+- **ngrok**: Set `HOSTING_PROVIDER=ngrok` and run `uv run python scripts/start_tunnel.py` to launch your tunnel.
+- **Render**: Set `HOSTING_PROVIDER=render` and provide `RENDER_URL=https://your-service.onrender.com`.
+
+---
+
+## Production Environment Variables Reference
+
+| Variable | Description | Example / Allowed Values |
+| :--- | :--- | :--- |
+| `MODE` | Runtime mode | `cloud` |
+| `DATABASE_URL` | PostgreSQL connection pooler URL | `postgresql+psycopg://postgres...:5432/postgres` |
+| `SUPABASE_URL` | Supabase project URL | `https://xyz.supabase.co` |
+| `STORAGE_BUCKET` | Storage bucket for original documents | `originals` |
+| `REVIEWER_TOKEN` | Master administrative reviewer token | 24+ character secret token |
+| `SESSION_SECRET` | Session cookie cryptographic signing secret | 24+ character secret |
+| `SECURE_COOKIES` | Set to `true` when hosted over HTTPS | `false` (local) / `true` (HTTPS production) |
+| `PROVIDER` | AI vision extraction provider | `openai` or `gemini` |
+| `MODEL_NAME` | Model identifier | `gpt-4o-mini` or `gemini-2.0-flash` |
+| `OPENAI_API_KEY` | OpenAI API key | `sk-proj-...` |
+| `GOOGLE_API_KEY` | Google AI API key | `AQ....` |
+| `AUTO_RECORD` | Automatically record valid documents | `true` |
+| `SHEETS_WEBHOOK_URL`| Google Apps Script Web App URL | `https://script.google.com/macros/s/.../exec` |
+| `SHEETS_WEBHOOK_SECRET` | Secret key matching the Apps Script property | Secret token string |
+| `HOSTING_PROVIDER` | Public webhook target switcher | `ngrok`, `render`, or `local` |
+| `NGROK_URL` | Public ngrok tunnel URL | `https://your-domain.ngrok-free.dev` |
+| `RENDER_URL` | Public Render domain URL | `https://your-service.onrender.com` |
+
+---
+
+## Core API Endpoints Reference
+
+All endpoints require `Authorization: Bearer <TOKEN>`:
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/v1/documents` | Upload and process single receipt/invoice (multipart: `file`, `project_id`, `auto_record`) |
+| `POST` | `/api/v1/batch-upload` | Sequential batch upload for multiple files |
+| `GET` | `/api/v1/documents/{id}` | Retrieve document extraction state, candidate, and review issues |
+| `PATCH`| `/api/v1/documents/{id}/fields` | Update extracted candidate fields and rerun deterministic validation |
+| `POST` | `/api/v1/documents/{id}/confirm` | Confirm candidate into an authoritative `Expense` record and sync to Sheets |
+| `POST` | `/api/v1/documents/{id}/dismiss` | Dismiss document from active processing |
+| `DELETE`| `/api/v1/documents/{id}` | Permanently delete document and its associated records |
+| `GET` | `/api/v1/expenses` | Query confirmed expenses (`sort_by=date|added|amount`, `project`, `category`) |
+| `POST` | `/api/v1/projects` | Create a new project (`id`, `name`) |
+| `GET` | `/api/v1/projects` | List all projects |
+| `POST` | `/api/v1/tokens` | Generate personal access token for a team member |
+| `GET` | `/api/v1/tokens` | List team access tokens |
+| `DELETE`| `/api/v1/tokens/{id}` | Revoke a team access token |
+
+---
+
+## Test Verification
+
+Run the full automated test suite (all unit tests, integration tests, validation gates, and oracle benchmarks):
+
+```powershell
+uv run python -m pytest
+```
+*Result: 72 passed (100%).*

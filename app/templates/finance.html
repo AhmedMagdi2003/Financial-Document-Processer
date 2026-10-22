@@ -38,7 +38,7 @@
 <form id="upload-form">
 <label for="project">Project</label>
 <select id="project" name="project_id" required><option value="" disabled {{ 'selected' if not filters.project }}>Choose a project</option>{% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if filters.project == p.id }}>{{ p.name }}</option>{% endfor %}</select>
-<p class="form-note"><a href="/projects">Manage projects</a> · <a href="/integrations">Connect Google Drive, Sheets or Zapier</a></p>
+<p class="form-note"><a href="/projects">Manage projects</a> · <a href="/integrations">Connect Google Drive, Sheets or Make.com</a></p>
 <label class="dropzone" for="file">
 <span class="upload-icon">↑</span>
 <strong>Choose invoices or receipts (multiple supported)</strong>
@@ -52,7 +52,7 @@
 </label>
 </div>
 <button id="upload-btn">Start Processing →</button>
-<span class="form-note">{{ 'Fixture replay: use files from tests/fixtures' if provider == 'fixture' else 'Configured extraction provider: ' ~ provider }}</span>
+<span class="form-note">{{ 'Extraction provider: ' ~ provider | upper if provider and provider != 'none' else 'AI Multimodal Vision & OCR Engine' }}</span>
 </form>
 <div id="batch-panel" class="batch-panel" hidden>
 <div class="batch-header">
@@ -120,9 +120,9 @@
   <section class="panel">
     <div class="panel-title">
       <h2>Spend by Category</h2>
-      <span class="tag">Category Breakdown</span>
+      <span class="tag">Category Numbers & Slices</span>
     </div>
-    <p class="muted">Expense distribution by taxonomy category.</p>
+    <p class="muted">Expenditures by category with direct amounts on each slice.</p>
     <div style="position:relative; height:240px; width:100%;">
       <canvas id="chart-categories"></canvas>
     </div>
@@ -161,22 +161,38 @@
 </label>
 <label>To<input type="date" name="end" value="{{ filters.end }}">
 </label>
+<label>Sort By<select name="sort_by">
+  <option value="added" {{ 'selected' if filters.sort_by == 'added' }}>Date Added (default)</option>
+  <option value="date" {{ 'selected' if filters.sort_by == 'date' }}>Invoice Date</option>
+  <option value="amount" {{ 'selected' if filters.sort_by == 'amount' }}>Amount</option>
+  <option value="vendor" {{ 'selected' if filters.sort_by == 'vendor' }}>Vendor</option>
+</select></label>
+<label>Order<select name="sort_order">
+  <option value="desc" {{ 'selected' if filters.sort_order == 'desc' }}>Descending (Newest / Highest)</option>
+  <option value="asc" {{ 'selected' if filters.sort_order == 'asc' }}>Ascending (Oldest / Lowest)</option>
+</select></label>
 <button class="secondary">Apply</button>
 <a href="/">Reset</a>
 </form>
+
 <div class="table-wrap">
-<table>
+<table id="expense-table">
 <thead>
 <tr>
-<th>Vendor / description</th>
+<th class="sortable-th" data-sort="vendor" style="cursor:pointer;" title="Click to sort by vendor">Vendor / description <span class="sort-indicator">⇅</span></th>
 <th>Project</th>
 <th>Category</th>
-<th>Date</th>
-<th class="number">Amount</th>
+<th class="sortable-th" data-sort="invoice-date" style="cursor:pointer;" title="Click to sort by invoice date">Invoice Date <span class="sort-indicator">⇅</span></th>
+<th class="sortable-th" data-sort="date-added" style="cursor:pointer;" title="Click to sort by date added">Date Added <span class="sort-indicator">⇅</span></th>
+<th class="number sortable-th" data-sort="amount" style="cursor:pointer;" title="Click to sort by amount">Amount <span class="sort-indicator">⇅</span></th>
 <th>Actions</th>
 </tr>
 </thead>
-<tbody id="expense-table-body">{% for e in records %}<tr id="expense-row-{{ e.id }}">
+<tbody id="expense-table-body">{% for e in records %}<tr id="expense-row-{{ e.id }}"
+    data-vendor="{{ e.vendor or '' }}"
+    data-invoice-date="{{ e.date or '' }}"
+    data-date-added="{{ e.confirmed_at.isoformat() if e.confirmed_at else '' }}"
+    data-amount="{{ e.total }}">
 <td>
 <strong>{{ e.vendor or 'Vendor unknown' }}</strong>
 <small class="cell-note">{{ e.description }}</small>
@@ -184,6 +200,7 @@
 <td>{{ e.project_id }}</td>
 <td>{{ e.category_id or 'Uncategorized' }}</td>
 <td>{{ e.date or 'Unknown' }}</td>
+<td>{{ e.confirmed_at.strftime('%Y-%m-%d %H:%M') if e.confirmed_at else '—' }}</td>
 <td class="number">
 <strong>{{ e.total }} {{ e.currency }}</strong>
 </td>
@@ -192,7 +209,7 @@
 <button type="button" class="danger" data-delete-expense="{{ e.id }}" style="padding:4px 8px; font-size:12px;" title="Delete expense record from database">Delete</button>
 </td>
 </tr>{% else %}<tr>
-<td colspan="6" class="empty">No confirmed expenses match these filters. Upload and confirm a document to get started.</td>
+<td colspan="7" class="empty">No confirmed expenses match these filters. Upload and confirm a document to get started.</td>
 </tr>{% endfor %}</tbody>
 </table>
 </div>

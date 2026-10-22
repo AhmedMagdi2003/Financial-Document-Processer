@@ -27,6 +27,7 @@ from app.errors import map_error
 from app.inspection import FileRejected
 from app.integrations import IntegrationError, Storage
 from app.models import (
+    AccessToken,
     Attempt,
     Category,
     Delivery,
@@ -94,8 +95,18 @@ def create_app(settings=None, engine=None):
             raise HTTPException(503, "Reviewer authentication is not configured")
         authorization = request.headers.get("authorization", "")
         if authorization.startswith("Bearer "):
-            if hmac.compare_digest(authorization[7:], expected):
+            token_val = authorization[7:].strip()
+            if hmac.compare_digest(token_val, expected):
                 return "demo-reviewer" if cfg.mode == "demo" else "internal-reviewer"
+            if sessions:
+                with sessions() as s:
+                    member_token = s.scalar(
+                        select(AccessToken).where(
+                            AccessToken.token == token_val, AccessToken.active.is_(True)
+                        )
+                    )
+                    if member_token:
+                        return member_token.name
             raise HTTPException(401, "Invalid API token")
         if not request.session.get("reviewer"):
             raise HTTPException(401, "Sign in to continue")
@@ -206,11 +217,28 @@ def create_app(settings=None, engine=None):
             raise HTTPException(429, "Too many attempts; wait one minute")
         attempts[host].append(monotonic())
         expected = cfg.reviewer_token.get_secret_value()
-        if not expected or not hmac.compare_digest(token, expected):
+        user_name = None
+        user_role = "reviewer"
+        if expected and hmac.compare_digest(token, expected):
+            user_name = "demo-reviewer" if cfg.mode == "demo" else "internal-reviewer"
+            user_role = "admin"
+        elif sessions:
+            with sessions() as s:
+                member_token = s.scalar(
+                    select(AccessToken).where(
+                        AccessToken.token == token, AccessToken.active.is_(True)
+                    )
+                )
+                if member_token:
+                    user_name = member_token.name
+                    user_role = member_token.role
+
+        if not user_name:
             raise HTTPException(401, "Invalid reviewer token")
         request.session.clear()
         request.session.update(
-            reviewer="demo-reviewer" if cfg.mode == "demo" else "internal-reviewer",
+            reviewer=user_name,
+            role=user_role,
             csrf=secrets.token_urlsafe(32),
         )
         return RedirectResponse("/", status_code=303)
@@ -234,6 +262,7 @@ def create_app(settings=None, engine=None):
             mode=cfg.mode,
             provider=cfg.provider,
             csrf=request.session.get("csrf", ""),
+            reviewer=request.session.get("reviewer", ""),
             path=request.url.path,
         )
         return templates.TemplateResponse(request, template, context)
@@ -248,11 +277,22 @@ def create_app(settings=None, engine=None):
         currency: str = "",
         start: str = "",
         end: str = "",
+        sort_by: str = "added",
+        sort_order: str = "desc",
     ):
         if not request.session.get("reviewer"):
             return RedirectResponse("/login", 303)
         with page_session(request) as session:
-            records = financial.expenses(session, project, category, currency, start, end)
+            records = financial.expenses(
+                session,
+                project,
+                category,
+                currency,
+                start,
+                end,
+                sort_by=sort_by,
+                sort_order=sort_order,
+            )
             documents = session.scalars(select(Document)).all()
             deliveries = session.scalars(select(Delivery)).all()
             duplicate_count = len(
@@ -283,7 +323,13 @@ def create_app(settings=None, engine=None):
                 duplicate_count=duplicate_count,
                 pipeline_stats=pipeline_stats,
                 filters=dict(
-                    project=project, category=category, currency=currency, start=start, end=end
+                    project=project,
+                    category=category,
+                    currency=currency,
+                    start=start,
+                    end=end,
+                    sort_by=sort_by,
+                    sort_order=sort_order,
                 ),
             )
 
@@ -635,5 +681,36 @@ def create_app(settings=None, engine=None):
         if not success:
             raise HTTPException(404, "Document not found")
         return {"status": "deleted", "id": document_id}
+
+    @application.get("/api/v1/tokens")
+    def list_tokens(session: DB, actor: Actor):
+        tokens = session.scalars(
+            select(AccessToken).order_by(AccessToken.created_at.desc())
+        ).all()
+        return [record(t) for t in tokens]
+
+    @application.post("/api/v1/tokens")
+    def create_token_endpoint(body: dict, session: DB, actor: Actor):
+        name = (body.get("name") or "").strip()
+        role = (body.get("role") or "reviewer").strip()
+        if not name:
+            raise HTTPException(400, "Name is required")
+        slug = "".join(c.lower() if c.isalnum() else "_" for c in name).strip("_")[:12]
+        token_str = f"tok_{slug}_{secrets.token_urlsafe(24)}"
+        t = AccessToken(token=token_str, name=name, role=role, active=True)
+        session.add(t)
+        emit(session, "human", "create_token", "succeeded", actor=actor, resource_id=t.id)
+        session.commit()
+        return record(t)
+
+    @application.delete("/api/v1/tokens/{token_id}")
+    def revoke_token_endpoint(token_id: str, session: DB, actor: Actor):
+        t = session.get(AccessToken, token_id)
+        if not t:
+            raise HTTPException(404, "Token not found")
+        t.active = False
+        emit(session, "human", "revoke_token", "revoked", actor=actor, resource_id=t.id)
+        session.commit()
+        return {"status": "revoked", "id": token_id}
 
     return application

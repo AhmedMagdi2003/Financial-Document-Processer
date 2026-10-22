@@ -3,11 +3,9 @@ and display ready-to-copy integration parameters.
 """
 
 import json
-import os
 import re
 import shutil
 import subprocess
-import sys
 import time
 import urllib.request
 from pathlib import Path
@@ -19,7 +17,9 @@ ENV_PATH = ROOT / ".env"
 def get_active_ngrok_url():
     """Query local ngrok API at http://127.0.0.1:4040/api/tunnels."""
     try:
-        req = urllib.request.Request("http://127.0.0.1:4040/api/tunnels", headers={"Accept": "application/json"})
+        req = urllib.request.Request(
+            "http://127.0.0.1:4040/api/tunnels", headers={"Accept": "application/json"}
+        )
         with urllib.request.urlopen(req, timeout=2) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             for tunnel in data.get("tunnels", []):
@@ -64,7 +64,7 @@ def main():
     # 1. Check if ngrok is already running
     active_url = get_active_ngrok_url()
     if active_url:
-        print(f"\n[FOUND] An active ngrok tunnel is already running at:")
+        print("\n[FOUND] An active ngrok tunnel is already running at:")
         print(f"        {active_url}")
         update_env_file(active_url)
         print_instructions(active_url)
@@ -83,7 +83,9 @@ def main():
         return
 
     print("\nStarting ngrok tunnel on port 8000...")
-    proc = subprocess.Popen([ngrok_bin, "http", "8000"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    proc = subprocess.Popen(
+        [ngrok_bin, "http", "8000"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
     
     # Wait for tunnel API to be ready
     retries = 15
@@ -99,7 +101,7 @@ def main():
         print("Try running manually in a separate terminal: ngrok http 8000")
         return
 
-    print(f"\n[SUCCESS] ngrok tunnel is live at:")
+    print("\n[SUCCESS] ngrok tunnel is live at:")
     print(f"          {active_url}")
     update_env_file(active_url)
     print_instructions(active_url)

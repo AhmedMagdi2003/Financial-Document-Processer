@@ -137,3 +137,13 @@ class Idempotency(Base):
     key: Mapped[str] = mapped_column(String(200), primary_key=True)
     fingerprint: Mapped[str] = mapped_column(String(64))
     document_id: Mapped[str] = mapped_column(ForeignKey("documents.id"))
+
+
+class AccessToken(Base):
+    __tablename__ = "access_tokens"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    token: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    role: Mapped[str] = mapped_column(String(50), default="reviewer")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

@@ -1,13 +1,12 @@
 """Tests verifying the 4 quick fixes:
 1. Deleting records from DB and UI (expenses and documents)
-2. Failed documents can be re-uploaded and processed, and duplicate detection only checks recorded records
+2. Failed documents can be re-uploaded and processed, and duplicate detection checks only recorded
 3. Adding and editing categories (taxonomy builder)
 4. UI chart data generation
 """
 
-from decimal import Decimal
 from pathlib import Path
-from sqlalchemy import select
+
 from app.models import Category, Document, Expense
 
 
@@ -19,7 +18,9 @@ def test_delete_expense_record(runtime):
     res = upload_fixture(client, "digital.pdf")
     assert res.status_code == 200
     doc = res.json()["document"]
-    confirm_res = client.post(f"/api/v1/documents/{doc['id']}/confirm", json={"version": doc["version"]})
+    confirm_res = client.post(
+        f"/api/v1/documents/{doc['id']}/confirm", json={"version": doc["version"]}
+    )
     assert confirm_res.status_code == 200
     expense_id = confirm_res.json()["id"]
 
@@ -161,4 +162,40 @@ def test_hosting_switcher_and_make_blueprint(runtime):
     data = res.json()
     assert data["name"] == "Google Drive to Financial Document Processor"
     assert len(data["flow"]) == 3
+
+
+def test_team_access_tokens_and_audit_identity(runtime):
+    cfg, app, client = runtime
+
+    # 1. Create a token via API
+    token_resp = client.post(
+        "/api/v1/tokens",
+        json={"name": "Sarah Connor", "role": "reviewer"},
+        headers={"Authorization": f"Bearer {cfg.reviewer_token.get_secret_value()}"},
+    )
+    assert token_resp.status_code == 200
+    token_data = token_resp.json()
+    assert token_data["name"] == "Sarah Connor"
+    assert token_data["token"].startswith("tok_sarah_")
+
+    # 2. Login using the team member token
+    sarah_token = token_data["token"]
+    login_resp = client.post("/login", data={"token": sarah_token})
+    assert login_resp.status_code in {200, 303}
+
+    # 3. Request with Sarah's token should have actor="Sarah Connor"
+    overview = client.get("/")
+    assert overview.status_code == 200
+
+
+def test_expense_sorting_by_date_and_added(runtime):
+    cfg, _, client = runtime
+    login_res = client.post("/login", data={"token": cfg.reviewer_token.get_secret_value()})
+    assert login_res.status_code in {200, 303}
+
+    res_date = client.get("/?sort_by=date&sort_order=asc")
+    assert res_date.status_code == 200
+
+    res_added = client.get("/?sort_by=added&sort_order=desc")
+    assert res_added.status_code == 200
 

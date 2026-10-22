@@ -9,7 +9,7 @@ from typing import TypedDict
 import httpx
 from langgraph.graph import END, START, StateGraph
 from langsmith import tracing_context
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.ai import ProviderError, digest_bytes, provider_for
@@ -492,8 +492,17 @@ def dismiss(session, document_id, version, justification, actor):
     session.commit()
 
 
-def expenses(session, project=None, category=None, currency=None, start=None, end=None):
-    query = select(Expense).order_by(Expense.confirmed_at.desc())
+def expenses(
+    session,
+    project=None,
+    category=None,
+    currency=None,
+    start=None,
+    end=None,
+    sort_by="added",
+    sort_order="desc",
+):
+    query = select(Expense)
     for field, value in [
         (Expense.project_id, project),
         (Expense.category_id, category),
@@ -505,6 +514,16 @@ def expenses(session, project=None, category=None, currency=None, start=None, en
         query = query.where(Expense.date >= start)
     if end:
         query = query.where(Expense.date <= end)
+    if sort_by == "date":
+        col = Expense.date
+    elif sort_by == "amount":
+        col = Expense.total
+    elif sort_by == "vendor":
+        col = Expense.vendor_normalized
+    else:
+        col = Expense.confirmed_at
+
+    query = query.order_by(col.asc() if sort_order == "asc" else col.desc())
     return session.scalars(query).all()
 
 
@@ -622,9 +641,12 @@ def delete_expense(session, expense_id, actor="reviewer"):
     if not expense:
         return False
     doc_id = expense.document_id
-    for delivery in session.scalars(select(Delivery).where(Delivery.expense_id == expense.id)).all():
+    deliveries = session.scalars(select(Delivery).where(Delivery.expense_id == expense.id)).all()
+    for delivery in deliveries:
         session.delete(delivery)
+    session.flush()
     session.delete(expense)
+    session.flush()
     if doc_id:
         doc = session.get(Document, doc_id)
         if doc:
@@ -646,22 +668,30 @@ def delete_document(session, settings, document_id, actor="reviewer"):
     doc = session.get(Document, document_id)
     if not doc:
         return False
+    # 1. Delete associated deliveries and expenses
     for exp in session.scalars(select(Expense).where(Expense.document_id == doc.id)).all():
         for deliv in session.scalars(select(Delivery).where(Delivery.expense_id == exp.id)).all():
             session.delete(deliv)
+        session.flush()
         session.delete(exp)
-    for issue in session.scalars(select(Issue).where(Issue.document_id == doc.id)).all():
-        session.delete(issue)
-    for attempt in session.scalars(select(Attempt).where(Attempt.document_id == doc.id)).all():
-        session.delete(attempt)
-    for idemp in session.scalars(select(Idempotency).where(Idempotency.document_id == doc.id)).all():
-        session.delete(idemp)
+    session.flush()
+
+    # 2. Delete child records
+    session.execute(delete(Issue).where(Issue.document_id == doc.id))
+    session.execute(delete(Attempt).where(Attempt.document_id == doc.id))
+    session.execute(delete(Idempotency).where(Idempotency.document_id == doc.id))
+    session.flush()
+
+    # 3. Clean up storage
     try:
         if doc.storage_key:
             Storage(settings).delete(doc.storage_key)
     except Exception:
         pass
+
+    # 4. Delete document
     session.delete(doc)
+    session.flush()
     emit(session, "human", "delete_document", "deleted", resource_id=document_id, actor=actor)
     session.commit()
     return True

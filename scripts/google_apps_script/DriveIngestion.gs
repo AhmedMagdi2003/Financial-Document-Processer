@@ -84,5 +84,10 @@ function processNewInvoices() {
 function installDriveTrigger() {
   ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'processNewInvoices')
     .forEach(t => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger('processNewInvoices').timeBased().everyMinutes(5).create();
+  ScriptApp.newTrigger('processNewInvoices').timeBased().everyMinutes(1).create();
+}
+
+// Run this function anytime to trigger instant processing without waiting for the 1-minute trigger
+function syncNow() {
+  processNewInvoices();
 }

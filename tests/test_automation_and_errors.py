@@ -189,7 +189,8 @@ def test_sheets_webhook_sync(runtime):
     def handler(request: httpx.Request):
         recorded_payloads.append(request.read())
         import json
-        return httpx.Response(200, json={"status": "ok", "id": json.loads(request.read())["values"][0]})
+        val = json.loads(request.read())["values"][0]
+        return httpx.Response(200, json={"status": "ok", "id": val})
 
     transport = httpx.MockTransport(handler)
 
