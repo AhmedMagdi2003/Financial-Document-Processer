@@ -1,6 +1,6 @@
 # Financial Document Assistant
 
-An automated, production-grade financial operations platform designed for multi-format receipt and invoice ingestion, multimodal AI vision extraction, deterministic mathematical and policy validation, autonomous recording gates, multi-user audit logging, and bi-directional cloud integrations (Google Sheets, Google Drive, Make.com).
+A financial operations application for turning invoice and receipt files into reviewable expense records, tracking project spending, and synchronizing approved data with connected services.
 
 ---
 
@@ -66,35 +66,18 @@ flowchart TD
 
 ---
 
-## Key Features
+## Product capabilities
 
-1. **Autonomous Processing with Strict Safety Gates**:
-   - Clean, valid invoices automatically process from ingestion to confirmed expense records and Google Sheets sync with **zero manual friction**.
-   - Human review is strictly quarantined to **4 non-negotiable safety conditions**:
-     - `MISSING_GRAND_TOTAL`: Grand total could not be determined.
-     - `MISSING_CURRENCY`: Currency could not be determined or is ambiguous.
-     - `POSSIBLE_DUPLICATE`: Matches an existing document by vendor, date, amount, or file digest.
-     - `TOTAL_INCONSISTENCY`: Subtotal + tax - discount does not equal the grand total.
-2. **Multi-User Access Tokens & Action Attribution**:
-   - Issue distinct access tokens tied to team members (e.g. `Ahmed Ali`, `Sarah Connor`).
-   - Every action—uploading documents, editing line items, approving expenses, modifying categories, or deleting records—is permanently recorded in the audit log with the user's name.
-3. **Multi-Format Ingestion**:
-   - Supports PDF, PNG, JPEG, and WEBP.
-   - Batch upload interface processes documents sequentially in an isolated queue with live visual progress.
-4. **Unified Multi-Currency Reporting**:
-   - Choose USD, EUR, or EGP from the application-wide top bar. Spend totals, category summaries, timelines, and each confirmed expense are converted into that reporting currency while original invoice amounts remain unchanged.
-   - The finance view shows the source-currency breakdown, exchange-rate pairs, provider, and rate update date. Rates use ExchangeRate-API Open Access (free, keyless endpoint) and are cached briefly; this is for reporting, not accounting or settlement.
-5. **Enhanced Data Visualizations**:
-   - Dynamic doughnut/pie chart with exact reporting-currency amounts and percentages rendered directly on each slice.
-   - Interactive, instant table sorting by **Invoice Date**, **Date Added to Project**, **Vendor**, and **Amount**.
-6. **No-Paywall Cloud Automations**:
-   - **Google Drive**: Background Apps Script polling every **1 minute** + instant one-click sync, plus ready-to-use Make.com scenario blueprint.
-   - **Google Sheets**: Apps Script webhook integration that updates/removes matching expense rows without a paid Zapier workflow; subject to Google's Apps Script quotas.
-   - **Tunnel & Hosting Switcher**: Built-in switcher between **Render** and **ngrok** via `.env`.
+- **Flexible document intake:** Upload PDF, PNG, JPEG, and WebP invoices or receipts individually or in a batch. PDF inspection handles selectable text, scanned pages, and mixed text/image documents.
+- **Structured extraction:** Capture vendor, date, invoice number, description, line items, subtotal, tax/VAT, discount, payable total, and currency using configured multimodal models such as OpenAI `gpt-4o-mini`.
+- **Useful expense categories:** Classify spending into configurable project categories such as personnel, travel, equipment, software, events, and operations.
+- **Validation with human control:** Flag missing totals or currency, arithmetic conflicts, and possible duplicates. Reviewers can inspect the source, correct fields, revalidate, confirm, or dismiss; unresolved records stay out of confirmed totals.
+- **Trackable project finances:** Maintain confirmed expense records, filter and export the tracker, and summarize spend by project, category, month, and currency.
+- **Unified reporting currencies:** Select USD, EUR, or EGP from the top bar. Totals, charts, timelines, and expense displays convert together while stored invoice values remain unchanged. Exchange-rate pairs, provider, and update date are shown for transparency; rates are for reporting, not settlement.
+- **Connected workflows:** Google Drive intake and Google Sheets synchronization are available through Apps Script, with idempotent uploads and row updates/deletions. Apps Script quotas and external credentials still apply. A Make.com blueprint is also provided.
+- **Operational safeguards:** Token-attributed actions, audit events, processing attempts, usage/cost estimates, bounded retries, and status views support investigation and routine operations.
 
-## Assessment coverage
-
-This repository contains the finance agent. The content-generation and publishing agent is maintained separately at [Content-Agent](https://github.com/AhmedMagdi2003/Content-Agent). The full requirement mapping, honest demo limitations, and candidate summary are in [docs/TECHNICAL_ASSESSMENT_AND_CANDIDATE_SUMMARY.md](docs/TECHNICAL_ASSESSMENT_AND_CANDIDATE_SUMMARY.md).
+The application can automatically record documents that pass its configured checks. Uncertain or inconsistent documents remain reviewable rather than being silently treated as confirmed expenses.
 
 ---
 
@@ -224,10 +207,6 @@ All endpoints require `Authorization: Bearer <TOKEN>`:
 
 ---
 
-## Demo video
-
-The currency-reporting preview and repeatable recording instructions are in [the financial demo video guide](docs/FINANCIAL_DEMO_VIDEO_GUIDE.md). The current MP4 uses an isolated database with fictional sample expenses; it demonstrates reporting-currency conversion and does not claim AI extraction or external Drive/Sheets delivery.
-
 ## Test Verification
 
 Run the full automated test suite (all unit tests, integration tests, validation gates, and oracle benchmarks):
@@ -235,4 +214,4 @@ Run the full automated test suite (all unit tests, integration tests, validation
 ```powershell
 uv run python -m pytest
 ```
-*Result: 74 passed (100%) in the current local offline run. External provider/Google account behavior is not covered by that claim.*
+*Result: 74 passed in the local offline suite. External provider and Google-account behavior requires separate configuration and live verification.*

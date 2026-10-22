@@ -1,18 +1,8 @@
-# Private assessment, implementation prompts and working guidance
+# Local-only notes and generated artifacts
 /[Pp]lan/
 /docs/private/
-/content-agent/data/
-/content-agent/tmp/
-/content-agent/recordings/
-CONTENT_MASTER_BUILD_PROMPT.md
-CONTENT_IMPLEMENTATION_PLAN.md
-CONTENT_ACCEPTANCE_MATRIX.md
-CONTENT_DEMO_VIDEO_GUIDE.md
-AGENTS.md
 IMPLEMENTATION_PLAN.md
 ACCEPTANCE_MATRIX.md
-DEMO_VIDEO_GUIDE.md
-Technical Assessment.pdf
 
 # Environment files and credentials; keep the safe configuration template
 .env
@@ -72,11 +62,9 @@ node_modules/
 /tmp/
 /temp/
 /recordings/
-/demo/raw_recordings/*.webm
-/demo/raw_recordings/*
-!/demo/raw_recordings/.gitkeep
-/demo/output/*
-!/demo/output/.gitkeep
+/demo/
+docs/FINANCIAL_DEMO_VIDEO_GUIDE.md
+docs/CONTENT_GENERATION_VIDEO_GUIDE.md
 .DS_Store
 Thumbs.db
 
