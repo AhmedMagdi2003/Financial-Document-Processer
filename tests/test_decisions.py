@@ -35,16 +35,21 @@ def test_currency_and_category_filters(runtime):
     assert client.get("/api/v1/expenses?start=2026-10-13").json() == []
 
 
-def test_pending_candidates_are_compared_for_duplicates(runtime):
+def test_only_recorded_candidates_are_compared_for_duplicates(runtime):
     _, _, client = runtime
     from tests.conftest import upload_fixture
 
     first = upload_fixture(client).json()["document"]
     second = upload_fixture(client, "business-duplicate.pdf").json()["document"]
     issues = client.get(f"/api/v1/documents/{second['id']}").json()["issues"]
-    duplicate = next(i for i in issues if i["code"] == "POSSIBLE_DUPLICATE")
-    assert first["id"] in duplicate["evidence"]["document_ids"]
+    assert not any(i["code"] == "POSSIBLE_DUPLICATE" for i in issues)
     assert client.get("/api/v1/expenses").json() == []
+    assert client.post(
+        f"/api/v1/documents/{first['id']}/confirm", json={"version": first["version"]}
+    ).status_code == 200
+    assert client.post(f"/api/v1/documents/{second['id']}/reextract").status_code == 200
+    issues = client.get(f"/api/v1/documents/{second['id']}").json()["issues"]
+    assert any(i["code"] == "POSSIBLE_DUPLICATE" and not i["resolution"] for i in issues)
 
 
 @pytest.mark.parametrize("format", ["JPEG", "PNG", "WEBP"])

@@ -1,0 +1,88 @@
+{
+  "name": "Google Drive to Financial Document Processor",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-drive:watchFilesInAFolder",
+      "version": 1,
+      "parameters": {
+        "select": "folder",
+        "folderId": "REPLACE_WITH_YOUR_FOLDER_ID",
+        "limit": 10
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0,
+          "name": "Watch Invoices in Folder"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "google-drive:downloadAFile",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "fileId": "{{1.id}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0,
+          "name": "Download Invoice / Receipt"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "http:makeAMultipartFormDataRequest",
+      "version": 1,
+      "parameters": {
+        "handleErrors": false,
+        "useCustomHeaders": true
+      },
+      "mapper": {
+        "url": "https://REPLACE_WITH_YOUR_HOST_URL/api/v1/documents",
+        "method": "POST",
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Bearer REPLACE_WITH_YOUR_REVIEWER_TOKEN"
+          },
+          {
+            "name": "ngrok-skip-browser-warning",
+            "value": "true"
+          }
+        ],
+        "fields": [
+          {
+            "name": "project_id",
+            "value": "river"
+          },
+          {
+            "name": "auto_record",
+            "value": "true"
+          },
+          {
+            "name": "file",
+            "file": "{{2.data}}",
+            "filename": "{{1.title}}"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0,
+          "name": "Upload to Financial Document Processor"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "version": 1,
+    "description": "Watches a Google Drive folder for new receipts/invoices and automatically uploads them to your Financial Document Processor backend for AI extraction and automatic recording."
+  }
+}

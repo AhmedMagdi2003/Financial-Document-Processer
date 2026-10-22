@@ -6,6 +6,7 @@
 <meta name="csrf-token" content="{{ csrf }}">
 <title>{% block title %}Workspace{% endblock %} · Impact workspace</title>
 <link rel="stylesheet" href="/static/style.css">
+<script src="/static/chart.umd.min.js"></script>
 <script src="/static/app.js" defer>
 </script>
 </head>
@@ -27,11 +28,13 @@
 <span>↗</span> Operations & activity</a>
 <a href="/categories" {% if path == '/categories' %}aria-current="page"{% endif %}>
 <span>▦</span> Expense categories</a>
+<a href="/projects" {% if path == '/projects' %}aria-current="page"{% endif %}><span>▣</span> Projects</a>
+<a href="/integrations" {% if path == '/integrations' %}aria-current="page"{% endif %}><span>⇄</span> Integrations</a>
 </nav>
 <div class="sidebar-foot">
 <span class="status-dot">
 </span> {{ 'Offline demo' if mode == 'demo' else 'Cloud workspace' }}
-<p>Fictional projects.<br>Private document review.</p>
+<p>Project expense tracking.<br>Private document review.</p>
 <button class="quiet" id="logout">Sign out</button>
 </div>
 </aside>

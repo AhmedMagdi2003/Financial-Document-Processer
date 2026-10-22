@@ -68,7 +68,13 @@
 <button class="secondary" data-review-action="reextract">Re-extract</button>
 <button class="danger" data-review-action="dismiss">Dismiss</button>
 </div>
-<p class="muted">Missing total/currency cannot be overridden. Re-extraction starts a new bounded attempt.</p>{% endif %}</section>
+<p class="muted">Missing total/currency cannot be overridden. Re-extraction starts a new bounded attempt.</p>{% endif %}
+
+<div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); display:flex; justify-content:space-between; align-items:center;">
+  <span class="muted" style="font-size:12px;">Delete document permanently from the database along with all related attempts and issues.</span>
+  <button type="button" class="danger" data-delete-document="{{ document.id }}" style="background:#fef2f2; border-color:#fca5a5; color:#b91c1c;">Delete document & records</button>
+</div>
+</section>
 <details class="panel">
 <summary>Extraction and amendment history ({{ attempts|length }})</summary>{% for a in attempts %}<p>
 <strong>{{ a.route }} · {{ a.status }}</strong> {{ a.created_at }}<br>{{ a.reason }}<br>

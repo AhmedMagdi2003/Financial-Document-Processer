@@ -1,19 +1,78 @@
-{% extends 'base.html' %}{% block title %}Categories{% endblock %}{% block body %}<div class="page-heading">
-<div>
-<p class="eyebrow">EXPENSE TAXONOMY</p>
-<h1>Categories with a clear purpose.</h1>
-<p>Edit definitions without changing the IDs used by historical records.</p>
+{% extends 'base.html' %}{% block title %}Categories{% endblock %}{% block body %}
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">EXPENSE TAXONOMY</p>
+    <h1>Categories with a clear purpose.</h1>
+    <p>Define new expense categories or update definitions for automated AI categorization.</p>
+  </div>
 </div>
+
+<!-- Add New Category Panel -->
+<section class="panel" style="margin-bottom: 24px; border: 1px solid var(--teal); background: #fdfefe;">
+  <div class="panel-title">
+    <div>
+      <p class="eyebrow" style="color:var(--teal);">TAXONOMY BUILDER</p>
+      <h2 style="margin:2px 0;">+ Add New Category</h2>
+    </div>
+    <span class="tag">AI Classification Prompt</span>
+  </div>
+  <p class="muted" style="margin-top:0;">Add a new expense category. The definition will be supplied to the extraction and categorization engine.</p>
+  <form id="new-category-form" style="display:flex; flex-direction:column; gap:12px;">
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+      <label>
+        Category Name
+        <input name="name" id="new-cat-name" placeholder="e.g. Cloud Hosting & SaaS" required>
+      </label>
+      <label>
+        Stable Category ID <small class="muted">(Optional, auto-generated if blank)</small>
+        <input name="id" id="new-cat-id" placeholder="e.g. cloud_hosting" pattern="[a-zA-Z0-9_-]*">
+      </label>
+    </div>
+    <label>
+      Category Definition & Scope
+      <textarea name="definition" id="new-cat-def" rows="3" minlength="5" placeholder="Specify what items belong in this category so the model categorizes receipts accurately..." required></textarea>
+    </label>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <label class="check" style="margin:0;">
+        <input type="checkbox" name="active" checked> Active for future classification
+      </label>
+      <button type="submit" id="btn-add-category">+ Create Category</button>
+    </div>
+  </form>
+</section>
+
+<div class="page-heading" style="margin-top:16px;">
+  <div>
+    <h2 style="margin:0;">Existing Categories ({{ categories|length }})</h2>
+    <p class="muted" style="margin:4px 0 0 0;">Edit definitions without changing IDs used by historical records.</p>
+  </div>
 </div>
-<div class="grid equal">{% for c in categories %}<section class="panel">
-<form class="category-form" data-id="{{ c.id }}">
-<label>Name<input name="name" value="{{ c.name }}" required>
-</label>
-<label>Definition<textarea name="definition" rows="3" minlength="10" required>{{ c.definition }}</textarea>
-</label>
-<label class="check">
-<input type="checkbox" name="active" {{ 'checked' if c.active }}> Active for new records</label>
-<p class="muted">Stable ID: {{ c.id }}</p>
-<button class="secondary">Save category</button>
-</form>
-</section>{% endfor %}</div>{% endblock %}
+
+<div class="grid equal" id="category-cards-grid">
+  {% for c in categories %}
+  <section class="panel" id="category-card-{{ c.id }}">
+    <form class="category-form" data-id="{{ c.id }}">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span class="badge-status {{ 'badge-recorded' if c.active else 'badge-failed' }}">
+          {{ 'Active' if c.active else 'Inactive' }}
+        </span>
+        <span class="muted" style="font-size:12px; font-family:monospace;">ID: {{ c.id }}</span>
+      </div>
+      <label>Name
+        <input name="name" value="{{ c.name }}" required>
+      </label>
+      <label>Definition
+        <textarea name="definition" rows="3" minlength="5" required>{{ c.definition }}</textarea>
+      </label>
+      <label class="check">
+        <input type="checkbox" name="active" {{ 'checked' if c.active }}> Active for new records
+      </label>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; gap:8px;">
+        <button type="submit" class="secondary" style="flex:1;">Save changes</button>
+        <button type="button" class="danger" data-delete-category="{{ c.id }}" style="padding:10px 14px;" title="Delete category">Delete</button>
+      </div>
+    </form>
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

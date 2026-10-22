@@ -1,258 +1,67 @@
-# Integration Guide: Google Drive, Zapier & Google Sheets
+# Google Sheets, Google Drive, and Zapier
 
-This guide explains how organizations can automate financial document ingestion and spreadsheet synchronization with the **Financial Document Assistant**.
+The finance service accepts PDFs, JPEGs, PNGs and WebP files at `POST /api/v1/documents`. The multipart fields are `file`, `project_id` (an existing project ID, not its display name) and optional `auto_record=true`. Authenticate with `Authorization: Bearer <REVIEWER_TOKEN>`. Get project IDs from authenticated `GET /api/v1/projects`.
 
----
+Google and Zapier run outside your computer. Deploy the finance server at a reachable HTTPS URL with a valid certificate. `localhost` and private LAN addresses do not work. Keep your API token in Script Properties or private Zap configuration; do not put it in a spreadsheet or shared source. The token grants reviewer access, so restrict script editors.
 
-## 1. Automated Workflow Overview
+## Google Sheets
 
-```
-[Invoice/Receipt Received]
-        │
-        ├─ Option A: User drops files in Web UI (Batch or Single)
-        ├─ Option B: Dropped into Google Drive folder (Free Google Apps Script)
-        └─ Option C: Zapier Trigger (Google Drive / Email / Slack)
-        │
-        ▼
-[POST /api/v1/documents (auto_record=true)]
-        │
-        ▼
-[Inspection & Routing] ─── Text-native PDF or Image/Scan Vision
-        │
-        ▼
-[AI Extraction & Field Normalization]
-        │
-        ▼
-[Multi-Layer Validation & Duplicate Check]
-        │
-        ├─────────────────────────────────────────────────┐
-        ▼                                                 ▼
-[ZERO Critical Conditions]               [ANY Critical Condition Occurs]
-  • Valid total & currency                 1. Missing grand total
-  • No duplicate detected                  2. Missing currency
-  • Consistent arithmetic                  3. Potential duplicate
-        │                                  4. Arithmetic conflict
-        ▼                                                 │
-[AUTOMATIC RECORDING]                                     ▼
-  • Creates confirmed Expense              [DEDICATED REVIEW QUEUE]
-  • Updates Document to RECORDED             • Tagged as NEEDS_REVIEW
-  • Emits audit event                        • Human reviewer inspects original
-        │                                    • Justified decision required
-        ▼
-[GOOGLE SHEETS SYNC]
-  • Row upserted in spreadsheet
-  • Real-time delivery status logged
+1. Create a spreadsheet with a tab named **Expenses**. Set row 1 to `ID | Project | Category | Vendor | Date | Description | Amount | Currency`.
+2. Open Extensions > Apps Script and paste `scripts/google_apps_script/SheetsWebhook.gs`.
+3. Under Project Settings > Script Properties set `SPREADSHEET_ID` and `SHEETS_WEBHOOK_SECRET` (a new random secret of at least 24 characters).
+4. Deploy as a Web App, execute as yourself, with access **Anyone**. Your Workspace administrator may restrict this setting. The script authenticates each request using its secret.
+5. Configure the finance server and restart it:
+
+```ini
+SHEETS_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT/exec
+SHEETS_WEBHOOK_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_24_CHARACTERS
 ```
 
----
+The receiver locks concurrent writes, finds an existing expense ID and updates that row; retries do not append duplicates. It escapes formula-like document text and writes amounts as numbers. Keep the ID column intact. Only this database should write expenses into this tab. Recording is independent of delivery: a Google error leaves the expense recorded and its delivery failed. Retry with authenticated `POST /api/v1/expenses/{expense_id}/sync` (three attempts maximum).
 
-## 2. Zapier Free-Plan Analysis & Honest Limitations
+The backend accepts only a JSON acknowledgement with `status: "ok"` and the matching expense ID. A sign-in page or HTTP 200 error response is a failed delivery. Google ContentService redirects to a one-time `script.googleusercontent.com` URL; the backend retrieves that response without resending the secret. See [Google ContentService](https://developers.google.com/apps-script/guides/content).
 
-Before configuring Zapier, review these verified platform constraints:
+Alternative: set `SHEETS_SPREADSHEET_ID` and `SHEETS_ACCESS_TOKEN` and leave `SHEETS_WEBHOOK_URL` blank. Enable Sheets API, authorize a token with spreadsheet write access, and share the sheet with that identity. Tokens expire; this application does not refresh OAuth tokens. REST uses RAW input and reserved row numbers in `Expenses`; do not sort, delete or insert rows in that mode. Use a separate reporting tab for sorted views.
 
-| Feature | Zapier Free Tier | Zapier Starter / Pro |
-| :--- | :--- | :--- |
-| **Monthly Task Allowance** | 100 tasks / month | 750+ tasks / month |
-| **Multi-step Zaps** | ❌ (2 steps only: 1 Trigger + 1 Action) | ✅ Supported |
-| **Webhooks by Zapier (Custom HTTP POST)** | ❌ **Premium Feature (Paid Only)** | ✅ Supported |
-| **Google Drive Trigger ("New File in Folder")** | ✅ Standard / Free | ✅ Supported |
-| **Google Sheets Trigger/Action** | ✅ Standard / Free | ✅ Supported |
+## Google Drive folder ingestion
 
-### The Free-Tier Bottleneck
-Because **Webhooks by Zapier** is classified as a Premium application, a user on Zapier's Free tier cannot natively trigger an HTTP POST request with document binary data to a custom API endpoint.
+Use a separate Apps Script project and paste `scripts/google_apps_script/DriveIngestion.gs`. In Script Properties configure:
 
-### Recommended Approaches
-1. **For 100% Free Automation**: Use the **Google Apps Script** recipe below. It is completely free, unlimited, native to Google Workspace, and requires zero paid subscriptions.
-2. **For Organizations with Paid Zapier**: Use the **Zapier Webhook Action** recipe detailed in Section 4.
+| Property | Value |
+| --- | --- |
+| `API_BASE_URL` | Public HTTPS finance base URL, without `/api/v1` |
+| `REVIEWER_TOKEN` | Same reviewer token as the finance server |
+| `FOLDER_ID` | ID from your Drive folder URL |
+| `PROJECT_ID` | Existing finance project ID |
+| `AUTO_RECORD` | `true` to automatically record valid documents; otherwise `false` |
+| `MAX_FILE_BYTES` | Optional; defaults to 10485760 and must not exceed server limit |
 
----
+Run `processNewInvoices` once and authorize Google access. Then run `installDriveTrigger` once to schedule polling every five minutes. Upload a sample invoice into the folder and inspect Apps Script Executions plus the finance review queue. The authorized script account must be able to read the folder. The poller scans direct files, not nested folders; Google-native Docs/Sheets are excluded. Use one script per folder/project mapping.
 
-## 3. Recommended Free Alternative: Google Apps Script (Drive → Financial Agent)
+The script sends each blob as multipart data and assigns a stable idempotency key to the project, Drive file ID and modification timestamp. It saves the returned document ID in Script Properties and polls its state. HTTP success alone is never counted as a recorded invoice:
 
-This script monitors a specific Google Drive folder every 5 minutes (or on a timer) and sends new invoices and receipts directly to the Financial Assistant API with `auto_record=true`.
+- `RECORDED` and `DISMISSED`: stop polling that file version.
+- `READY_TO_RECORD` and `NEEDS_REVIEW`: inspect and confirm in the finance UI; the script does not bypass review.
+- `FAILED`: call the existing re-extraction endpoint, up to three attempts. Re-extraction follows the server's `AUTO_RECORD` setting, so set that server setting consistently with the script if you want retries to record automatically.
+- Network/HTTP errors: keep the same idempotency key and back off. After five consecutive errors, pause the item. To resume after fixing configuration, edit its `drive-...` Script Property JSON: remove `paused`, reset `errors` and `retries` to zero, and remove `nextAttempt`; retain `documentId`. Do not erase state after an ambiguous timeout.
 
-### Setup Instructions (3 minutes)
+No files are renamed, moved or deleted. Files remain traceable in Drive. Duplicate file copies are also checked by the server. Changing a file creates a new version key. This lightweight poller uses persistent Script Properties and a continuation cursor; it handles at most two uploads/status checks per run and stops starting work after three minutes. One long request may still hit Google's execution limit. Apps Script is quota-limited, not unlimited: review [current quotas](https://developers.google.com/apps-script/guides/services/quotas), including execution time, URL Fetch and property storage. Archive completed state only after removing the corresponding source files from the watched folder; otherwise they will be considered again. For large volumes use a durable queue/Drive API worker.
 
-1. **Create a Folder in Google Drive**:
-   - Name it `Impact Invoices & Receipts`.
-   - Copy the Folder ID from the URL (the string after `folders/` in `https://drive.google.com/drive/folders/1ABCxyz...`).
+Google references: [multipart URL Fetch](https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app), [File.getBlob](https://developers.google.com/apps-script/reference/drive/file), [time triggers](https://developers.google.com/apps-script/reference/script/clock-trigger-builder).
 
-2. **Open Google Apps Script**:
-   - Go to [script.google.com](https://script.google.com/) and click **New Project**.
-   - Name the project `Drive to Financial Agent`.
+## Zapier: Drive to finance
 
-3. **Paste the Automation Script**:
-   ```javascript
-   // =========================================================================
-   // Google Drive to Financial Agent Automation (100% Free)
-   // =========================================================================
-   const CONFIG = {
-     API_ENDPOINT: "https://your-domain.com/api/v1/documents", // Your backend URL
-     REVIEWER_TOKEN: "YOUR_REVIEWER_TOKEN_HERE",               // Same as REVIEWER_TOKEN in .env
-     FOLDER_ID: "YOUR_GOOGLE_DRIVE_FOLDER_ID",               // Google Drive Folder ID
-     PROJECT_ID: "Urban Climate Research",                     // Project name/ID
-     PROCESSED_TAG: "[PROCESSED]"                             // Prefix added to processed files
-   };
+Webhooks by Zapier is listed as a premium app; verify your account's current plan before enabling the Zap. Do not assume the free plan supports this production workflow. See [Zapier's app listing](https://zapier.com/apps/webhook/integrations).
 
-   function processNewInvoices() {
-     const folder = DriveApp.getFolderById(CONFIG.FOLDER_ID);
-     const files = folder.getFiles();
+1. Trigger: Google Drive > New File in Folder. Connect the account with folder access and select the folder.
+2. Action: Webhooks by Zapier > **POST**. URL: `https://YOUR_FINANCE_HOST/api/v1/documents`. Payload Type: **form**.
+3. Map the action's **File** field to the Drive step's actual file object/download output. This must become a binary multipart part named `file`. A Drive sharing/view URL is not file content. If the trigger only supplies metadata, add a Google Drive action that retrieves the file before this step. Do not make private financial documents publicly shared just to make a URL work.
+4. In Data, add `project_id` with the existing finance project ID and `auto_record` with `true` or `false`. Add headers `Authorization: Bearer YOUR_REVIEWER_TOKEN` and `Idempotency-Key: zapier-<project ID>-<Drive file ID>-<modified timestamp>` (keep the resulting key below 200 characters). Leave Content-Type unset so Zapier creates the multipart boundary.
+5. Test with an actual PDF. Confirm the request has the binary `file` part; a 422 response usually means a required form/file field is missing. Confirm response `document.id` and `document.state` in the finance UI before enabling the Zap.
+6. Route `NEEDS_REVIEW`/`READY_TO_RECORD` to human review and `FAILED` to investigation; HTTP 200 does not mean recorded. Replaying the same upload key returns the same document. To retry a failed extraction use authenticated `POST /api/v1/documents/{id}/reextract`; do not create new keys to evade idempotency. Do not run both this Zap and the poller for the same folder unless you intentionally want duplicate submissions.
 
-     while (files.hasNext()) {
-       const file = files.next();
-       const filename = file.getName();
+Use POST, not Custom Request: Zapier explicitly states that Custom Request cannot send file objects. Refer to [sending webhooks](https://help.zapier.com/hc/en-us/articles/8496326446989-Send-webhooks-in-Zaps) and [sending files](https://help.zapier.com/hc/en-us/articles/8496288813453-Send-files-in-Zap-workflows). Field names and availability can vary by connector version; the API requires an actual multipart upload, not JSON containing a URL. If your action cannot produce it, use the supplied Apps Script integration.
 
-       // Skip already processed documents
-       if (filename.startsWith(CONFIG.PROCESSED_TAG)) {
-         continue;
-       }
+## Verification
 
-       // Only process supported formats
-       const mimeType = file.getMimeType();
-       if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(mimeType)) {
-         Logger.log("Skipping unsupported format: " + filename);
-         continue;
-       }
-
-       try {
-         Logger.log("Uploading file: " + filename);
-         const blob = file.getBlob();
-
-         const payload = {
-           file: blob,
-           project_id: CONFIG.PROJECT_ID,
-           auto_record: "true"
-         };
-
-         const options = {
-           method: "post",
-           headers: {
-             "Authorization": "Bearer " + CONFIG.REVIEWER_TOKEN
-           },
-           payload: payload,
-           muteHttpExceptions: true
-         };
-
-         const response = UrlFetchApp.fetch(CONFIG.API_ENDPOINT, options);
-         const resCode = response.getResponseCode();
-         const resText = response.getContentText();
-
-         if (resCode >= 200 && resCode < 300) {
-           const result = JSON.parse(resText);
-           Logger.log("Success! Document ID: " + result.document.id + " State: " + result.document.state);
-           file.setName(CONFIG.PROCESSED_TAG + " " + filename);
-         } else {
-           Logger.log("Failed with status " + resCode + ": " + resText);
-         }
-       } catch (err) {
-         Logger.log("Error processing " + filename + ": " + err.toString());
-       }
-     }
-   }
-   ```
-
-4. **Set Up a Recurring Trigger**:
-   - In Google Apps Script, click the **Triggers (Clock Icon)** on the left sidebar.
-   - Click **Add Trigger** (bottom right).
-   - Choose function: `processNewInvoices`.
-   - Event source: `Time-driven` → `Minutes timer` → `Every 5 minutes` (or `Every 1 minute`).
-   - Save.
-
-Now, whenever anyone drops a receipt or PDF invoice into that Google Drive folder, it is automatically uploaded, verified, auto-recorded if valid, and renamed with `[PROCESSED]`.
-
----
-
-## 4. Zapier Configuration (For Paid / Starter Plans)
-
-If your organization has access to Zapier Premium Apps:
-
-1. **Trigger**:
-   - App: **Google Drive**
-   - Event: **New File in Folder**
-   - Select your target folder.
-
-2. **Action**:
-   - App: **Webhooks by Zapier**
-   - Event: **Custom Request**
-   - Method: `POST`
-   - URL: `https://your-domain.com/api/v1/documents`
-   - Data / Body:
-     * `file`: Use the `File` (Hydrated file object) from Step 1.
-     * `project_id`: `Urban Climate Research`
-     * `auto_record`: `true`
-   - Headers:
-     * `Authorization`: `Bearer <REVIEWER_TOKEN>`
-   - Test and turn on the Zap.
-
----
-
-## 5. Google Sheets Integration Setup
-
-When an expense is recorded (either automatically or through manual confirmation), the application immediately updates a Google Sheets spreadsheet.
-
-You can connect Google Sheets using either of two methods:
-
-### Option A: Google Apps Script Webhook (Recommended & Simplest)
-
-1. Open your target Google Sheet.
-2. In row 1, set the headers:
-   `ID | Project | Category | Vendor | Date | Description | Amount | Currency`
-3. Click **Extensions → Apps Script**.
-4. Paste this webhook receiver:
-   ```javascript
-   function doPost(e) {
-     try {
-       const json = JSON.parse(e.postData.contents);
-       const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-       const exp = json.expense;
-
-       sheet.appendRow([
-         exp.id,
-         exp.project,
-         exp.category,
-         exp.vendor,
-         exp.date,
-         exp.description,
-         exp.total,
-         exp.currency
-       ]);
-
-       return ContentService.createTextOutput(JSON.stringify({status: "ok"}))
-         .setMimeType(ContentService.MimeType.JSON);
-     } catch (err) {
-       return ContentService.createTextOutput(JSON.stringify({status: "error", error: err.toString()}))
-         .setMimeType(ContentService.MimeType.JSON);
-     }
-   }
-   ```
-5. Click **Deploy → New Deployment**.
-   - Type: **Web App**
-   - Execute as: **Me**
-   - Who has access: **Anyone**
-   - Click Deploy and copy the **Web App URL**.
-6. In your `.env` file on the backend server, add:
-   ```ini
-   SHEETS_WEBHOOK_URL=https://script.google.com/macros/s/AKfycb.../exec
-   ```
-7. Restart the backend server. Every validated expense will now append into Google Sheets in real time.
-
-### Option B: Google Sheets REST API v4
-
-If you prefer using Google Cloud OAuth credentials:
-1. In `.env`, set:
-   ```ini
-   SHEETS_SPREADSHEET_ID=1xYz...your_spreadsheet_id
-   SHEETS_ACCESS_TOKEN=ya29...your_oauth_access_token
-   ```
-2. The application reserves row numbers sequentially and performs atomic upserts to `Expenses!A{row}:H{row}`.
-
----
-
-## 6. How Users Can Inspect & Verify Integration Results
-
-1. **Financial Overview Dashboard (`/`)**:
-   - The metric card **"Google Sheets projection"** shows the live count of synced vs. failed deliveries.
-2. **Operations & Audit Log (`/operations`)**:
-   - Filter by stage `integration` to view exact timestamps, HTTP response codes, and retry counts for Google Sheets deliveries.
-3. **Manual Re-Sync**:
-   - In `/api/v1/expenses/{id}/sync`, users or administrators can manually trigger a retry if an external service temporarily dropped a connection.
+Record one test expense, check its row in Expenses, then retry the same delivery and ensure no duplicate row appears. Upload a file into the watched folder and confirm its project and review/recorded status. Check finance Operations for delivery failures and Apps Script Executions/Zap History for ingestion failures. Automated tests use fake HTTP transports; they do not prove your Google account, deployment permissions or live credentials are connected.

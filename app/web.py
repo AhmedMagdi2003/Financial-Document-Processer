@@ -38,11 +38,14 @@ from app.models import (
     uid,
 )
 from app.observability import cost_summary, current_request, emit
+from app.operations import build_operations_dashboard
 from app.schemas import (
+    CategoryCreate,
     CategoryInput,
     ConfirmInput,
     ReviewInput,
 )
+from app.workspace import install_workspace_routes
 
 ROOT = Path(__file__).parent
 
@@ -235,6 +238,8 @@ def create_app(settings=None, engine=None):
         )
         return templates.TemplateResponse(request, template, context)
 
+    install_workspace_routes(application, cfg, db, authenticated, render)
+
     @application.get("/", response_class=HTMLResponse)
     def overview(
         request: Request,
@@ -257,29 +262,40 @@ def create_app(settings=None, engine=None):
                     )
                 ).all()
             )
+            summ = financial.summary(records)
+            pipeline_stats = {
+                "recorded": sum(1 for d in documents if d.state == "RECORDED"),
+                "review": sum(1 for d in documents if d.state == "NEEDS_REVIEW"),
+                "ready": sum(1 for d in documents if d.state == "READY_TO_RECORD"),
+                "failed": sum(1 for d in documents if d.state == "FAILED"),
+                "dismissed": sum(1 for d in documents if d.state == "DISMISSED"),
+                "duplicates": duplicate_count,
+            }
             return render(
                 request,
                 "finance.html",
                 records=records,
-                summary=financial.summary(records),
+                summary=summ,
                 projects=session.scalars(select(Project)).all(),
                 categories=session.scalars(select(Category)).all(),
                 documents=documents,
                 deliveries=deliveries,
                 duplicate_count=duplicate_count,
+                pipeline_stats=pipeline_stats,
                 filters=dict(
                     project=project, category=category, currency=currency, start=start, end=end
                 ),
             )
 
     @application.get("/review", response_class=HTMLResponse)
-    def review(request: Request):
+    def review(request: Request, project: str = ""):
         if not request.session.get("reviewer"):
             return RedirectResponse("/login", 303)
         with page_session(request) as session:
             docs = session.scalars(
                 select(Document)
                 .where(Document.state.not_in(["RECORDED", "DISMISSED"]))
+                .where(Document.project_id == project if project else True)
                 .order_by(Document.created_at.desc())
             ).all()
             return render(request, "review.html", documents=docs)
@@ -309,40 +325,72 @@ def create_app(settings=None, engine=None):
             )
 
     @application.get("/operations", response_class=HTMLResponse)
-    def operations(request: Request, q: str = ""):
+    def operations(request: Request, q: str = "", project: str = ""):
         if not request.session.get("reviewer"):
             return RedirectResponse("/login", 303)
         with page_session(request) as session:
+            selected_project = session.get(Project, project) if project else None
+            if project and not selected_project:
+                raise HTTPException(404, "Project not found")
             query = select(Event).order_by(Event.timestamp.desc()).limit(200)
+            project_docs = select(Document.id).where(Document.project_id == project)
+            project_runs = select(Attempt.run_id).where(Attempt.document_id.in_(project_docs))
+            if project:
+                query = query.where(or_(
+                    Event.resource_id.in_(project_docs), Event.run_id.in_(project_runs)
+                ))
             if q:
                 query = query.where(
                     or_(Event.run_id == q, Event.resource_id == q, Event.request_id == q)
                 )
             usage_query = select(Usage)
+            if project:
+                usage_query = usage_query.where(Usage.run_id.in_(project_runs))
             if q:
-                usage_query = usage_query.where(Usage.run_id == q)
+                matching_runs = select(Event.run_id).where(
+                    or_(Event.resource_id == q, Event.request_id == q),
+                    Event.run_id.is_not(None),
+                )
+                document_runs = select(Attempt.run_id).where(Attempt.document_id == q)
+                usage_query = usage_query.where(or_(
+                    Usage.run_id == q, Usage.run_id.in_(matching_runs),
+                    Usage.run_id.in_(document_runs),
+                ))
             usage_rows = session.scalars(usage_query).all()
-            all_documents = session.scalars(select(Document)).all()
-            completed = [d for d in all_documents if d.state not in {"RECEIVED", "PROCESSING"}]
-            failed = sum(d.state == "FAILED" for d in completed)
-            review_count = sum(d.state == "NEEDS_REVIEW" for d in completed)
-            operations_stats = {
-                "documents": len(all_documents),
-                "completed": len(completed),
-                "failed": failed,
-                "review": review_count,
-                "success_rate": round(100 * (len(completed) - failed) / len(completed), 1)
-                if completed
-                else None,
-                "review_rate": round(100 * review_count / len(completed), 1) if completed else None,
+            all_documents = session.scalars(select(Document).where(
+                Document.project_id == project if project else True
+            )).all()
+            recent_events = session.scalars(query).all()
+            dashboard = build_operations_dashboard(all_documents, recent_events, usage_rows)
+            operations_stats = dashboard["stats"]
+            stage_durations = defaultdict(list)
+            status_counts = defaultdict(int)
+            for ev in recent_events:
+                status_counts[ev.status] += 1
+                if ev.duration_ms is not None and ev.duration_ms > 0:
+                    stage_durations[ev.stage].append(ev.duration_ms)
+            stage_averages = {
+                stage: round(sum(durs) / len(durs), 1)
+                for stage, durs in stage_durations.items()
+            }
+            ops_chart_data = {
+                "stages": list(stage_averages.keys()),
+                "avg_latencies": list(stage_averages.values()),
+                "status_labels": list(status_counts.keys()),
+                "status_values": list(status_counts.values()),
             }
             return render(
                 request,
                 "operations.html",
-                events=session.scalars(query).all(),
+                events=recent_events,
                 usage=usage_rows,
                 costs=cost_summary(usage_rows),
                 stats=operations_stats,
+                dashboard=dashboard,
+                projects=session.scalars(select(Project).order_by(Project.name)).all(),
+                project_id=project,
+                selected_project=selected_project,
+                ops_chart_data=ops_chart_data,
                 q=q,
                 tracing=cfg.tracing_backends,
             )
@@ -552,5 +600,40 @@ def create_app(settings=None, engine=None):
         emit(session, "human", "edit_category", "succeeded", actor=actor, category_id=category_id)
         session.commit()
         return record(category)
+
+    @application.post("/api/v1/categories")
+    def create_category(body: CategoryCreate, session: DB, actor: Actor):
+        category = financial.create_category(
+            session,
+            name=body.name,
+            definition=body.definition,
+            id=body.id,
+            active=body.active,
+            actor=actor,
+        )
+        return record(category)
+
+    @application.delete("/api/v1/categories/{category_id}")
+    def delete_category(category_id: str, session: DB, actor: Actor):
+        category = session.get(Category, category_id)
+        if not category:
+            raise HTTPException(404, "Category not found")
+        session.delete(category)
+        session.commit()
+        return {"status": "deleted", "id": category_id}
+
+    @application.delete("/api/v1/expenses/{expense_id}")
+    def delete_expense(expense_id: str, session: DB, actor: Actor):
+        success = financial.delete_expense(session, expense_id, actor)
+        if not success:
+            raise HTTPException(404, "Expense record not found")
+        return {"status": "deleted", "id": expense_id}
+
+    @application.delete("/api/v1/documents/{document_id}")
+    def delete_document(document_id: str, session: DB, actor: Actor):
+        success = financial.delete_document(session, cfg, document_id, actor)
+        if not success:
+            raise HTTPException(404, "Document not found")
+        return {"status": "deleted", "id": document_id}
 
     return application

@@ -35,8 +35,23 @@ class Settings(BaseSettings):
     sheets_spreadsheet_id: str = ""
     sheets_access_token: SecretStr = SecretStr("")
     sheets_webhook_url: str = ""
+    sheets_webhook_secret: SecretStr = SecretStr("")
     auto_record: bool = False
     tracing_backends: Literal["none", "langfuse", "langsmith", "both"] = "none"
+    hosting_provider: Literal["render", "ngrok", "local"] = "render"
+    render_url: str = ""
+    ngrok_url: str = ""
+    public_base_url: str = ""
+
+    @property
+    def active_public_url(self) -> str:
+        if self.public_base_url:
+            return self.public_base_url.rstrip("/")
+        if self.hosting_provider == "render" and self.render_url:
+            return self.render_url.rstrip("/")
+        if self.hosting_provider == "ngrok" and self.ngrok_url:
+            return self.ngrok_url.rstrip("/")
+        return "http://127.0.0.1:8000"
 
     @model_validator(mode="after")
     def guard(self):

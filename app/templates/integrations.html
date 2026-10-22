@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block title %}Integrations{% endblock %}
+{% block crumb %}Integrations{% endblock %}
+{% block body %}
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">CONNECTED FINANCE</p>
+    <h1>From shared folders to recorded expenses.</h1>
+    <p>Connect Google Drive for automated ingestion, Make.com / Zapier for visual workflows, and Google Sheets for live financial projection.</p>
+  </div>
+  <a class="button secondary" href="/api/v1/integrations/guide">Download setup guide ↓</a>
+</div>
+
+<!-- Active Hosting Environment Banner -->
+<section class="panel" style="border-left: 4px solid var(--teal); background: #fcfdfc; margin-bottom: 24px;">
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div>
+      <span class="eyebrow" style="color:var(--teal);">PUBLIC REACHABILITY & HOSTING SWITCHER</span>
+      <h3 style="margin:4px 0;">Active Host: <code style="font-size:15px; color:var(--teal);">{{ active_public_url }}</code></h3>
+      <p class="muted" style="margin:0;">Current Provider Mode: <strong>{{ hosting_provider|upper }}</strong>. Switch between Render and ngrok anytime in your <code>.env</code> file.</p>
+    </div>
+    <span class="badge-status badge-recorded" style="padding:6px 12px; font-size:13px;">{{ hosting_provider|upper }} ACTIVE</span>
+  </div>
+  <hr style="margin:12px 0; border:0; border-top:1px solid var(--line);">
+  <div style="display:flex; gap:16px; font-size:13px; color:var(--ink);">
+    <div><strong>Render URL:</strong> <code>https://your-service.onrender.com</code></div>
+    <div>·</div>
+    <div><strong>ngrok Tunnel:</strong> run <code>python scripts/start_tunnel.py</code> to auto-sync local URL</div>
+    <div>·</div>
+    <div><strong>Switch in .env:</strong> <code>HOSTING_PROVIDER=render</code> or <code>HOSTING_PROVIDER=ngrok</code></div>
+  </div>
+</section>
+
+<div class="grid equal">
+  <!-- Google Drive Apps Script -->
+  <section class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <p class="eyebrow" style="color:var(--teal); margin:0;">100% FREE AUTOMATION · GOOGLE DRIVE</p>
+      <span class="tag">Zero Third-Party Fees</span>
+    </div>
+    <h2 style="margin:8px 0;">Native Drive Ingestion (Apps Script)</h2>
+    <p>Runs directly inside your Google account. A free 5-minute time trigger watches your Drive folder and pushes new receipts/invoices into the Finance API.</p>
+    <ul style="padding-left:18px; line-height:1.7; font-size:13px; color:var(--ink);">
+      <li>Uploads PDF, PNG, JPEG, and WebP documents automatically.</li>
+      <li>Uses stable idempotency keys to avoid duplicate reprocessing.</li>
+      <li>No Zapier or Make.com accounts needed; 100% free forever.</li>
+    </ul>
+    <div style="margin-top:14px; display:flex; gap:8px;">
+      <a class="button" href="/api/v1/integrations/scripts/DriveIngestion.gs">Download Drive script ↓</a>
+    </div>
+  </section>
+
+  <!-- Google Sheets Sync -->
+  <section class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <p class="eyebrow" style="color:var(--teal); margin:0;">OUTBOUND SYNC · GOOGLE SHEETS</p>
+      <span class="tag">{{ 'Configured' if sheets_configured else 'Pending Setup' }}</span>
+    </div>
+    <h2 style="margin:8px 0;">Live Spreadsheet Projection</h2>
+    <p>Whenever an expense is confirmed or auto-recorded, it syncs directly to your Google Sheet without duplicate rows.</p>
+    <ul style="padding-left:18px; line-height:1.7; font-size:13px; color:var(--ink);">
+      <li>Works via free Google Apps Script Webhook (no OAuth expiration).</li>
+      <li>Upserts rows by immutable Expense ID.</li>
+      <li>Database remains the source of truth if someone edits the sheet.</li>
+    </ul>
+    <div style="margin-top:14px; display:flex; gap:8px;">
+      <a class="button secondary" href="/api/v1/integrations/scripts/SheetsWebhook.gs">Download Sheets webhook ↓</a>
+    </div>
+  </section>
+</div>
+
+<div class="grid equal" style="margin-top:24px;">
+  <!-- Make.com Automation -->
+  <section class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <p class="eyebrow" style="color:#7c3aed; margin:0;">VISUAL WORKFLOW · MAKE.COM</p>
+      <span class="tag">1,000 Free Ops/mo</span>
+    </div>
+    <h2 style="margin:8px 0;">Make.com (Integromat) Integration</h2>
+    <p>Unlike Zapier, Make.com includes <strong>Webhooks & HTTP requests on its 100% Free plan</strong>. Import our ready-to-use scenario blueprint with one click:</p>
+    <ol style="padding-left:18px; line-height:1.7; font-size:13px; color:var(--ink);">
+      <li>Create a free account on <a href="https://make.com" target="_blank" rel="noopener">Make.com</a>.</li>
+      <li>Create a new Scenario, click <strong>... > Import Blueprint</strong>.</li>
+      <li>Select the downloaded blueprint JSON file.</li>
+      <li>Connect your Google Drive account and set your Reviewer Token.</li>
+    </ol>
+    <div style="margin-top:14px; display:flex; gap:8px;">
+      <a class="button" style="background:#7c3aed; border-color:#6d28d9;" href="/api/v1/integrations/scripts/google_drive_to_finance_blueprint.json">Download Make.com Blueprint ↓</a>
+    </div>
+  </section>
+
+  <!-- Zapier Overview -->
+  <section class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <p class="eyebrow" style="color:var(--orange); margin:0;">AUTOMATION · ZAPIER</p>
+      <span class="tag">Requires Paid Zapier Plan</span>
+    </div>
+    <h2 style="margin:8px 0;">Zapier Webhook Ingestion</h2>
+    <p>If your organization already has a Zapier Starter/Professional subscription:</p>
+    <ul style="padding-left:18px; line-height:1.7; font-size:13px; color:var(--ink);">
+      <li><strong>Trigger:</strong> Google Drive > New File in Folder.</li>
+      <li><strong>Action:</strong> Webhooks by Zapier > <strong>POST</strong> (Payload Type: form).</li>
+      <li>Map binary file object to <code>file</code>, add <code>project_id</code> and <code>auto_record=true</code>.</li>
+      <li>Headers: <code>Authorization: Bearer YOUR_REVIEWER_TOKEN</code>.</li>
+    </ul>
+    <p class="muted" style="font-size:12px; margin-top:10px;"><em>Note: Webhooks by Zapier is not available on Zapier's free tier. Use Google Apps Script or Make.com for zero cost.</em></p>
+  </section>
+</div>
+{% endblock %}

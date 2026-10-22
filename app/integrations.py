@@ -51,6 +51,23 @@ class Storage:
             raise IntegrationError("STORAGE_READ_FAILED")
         return response.content
 
+    def delete(self, key):
+        cfg = self.settings
+        if not (cfg.supabase_url and cfg.supabase_service_key.get_secret_value()):
+            root = (cfg.local_data_dir / "originals").resolve()
+            path = (root / key).resolve()
+            if path.is_relative_to(root) and path.exists():
+                path.unlink(missing_ok=True)
+            return
+        try:
+            httpx.delete(
+                f"{cfg.supabase_url}/storage/v1/object/{cfg.storage_bucket}/{quote(key)}",
+                headers={"Authorization": f"Bearer {cfg.supabase_service_key.get_secret_value()}"},
+                timeout=15,
+            )
+        except Exception:
+            pass
+
 
 class Sheets:
     """Fixed reserved row + values.update makes retries an upsert, not append."""
@@ -74,10 +91,16 @@ class Sheets:
             raise IntegrationError("SHEETS_NOT_CONFIGURED")
         webhook_url = getattr(self.settings, "sheets_webhook_url", "")
         if webhook_url:
-            with httpx.Client(transport=self.transport, timeout=15) as client:
+            secret = self.settings.sheets_webhook_secret.get_secret_value()
+            if len(secret) < 24:
+                raise IntegrationError("SHEETS_WEBHOOK_SECRET_REQUIRED")
+            if not webhook_url.startswith("https://"):
+                raise IntegrationError("SHEETS_WEBHOOK_HTTPS_REQUIRED")
+            with httpx.Client(transport=self.transport, timeout=30) as client:
                 response = client.post(
                     webhook_url,
                     json={
+                        "secret": secret,
                         "row": row,
                         "values": values,
                         "expense": {
@@ -92,8 +115,22 @@ class Sheets:
                         },
                     },
                 )
+                # ContentService returns a one-time GET location. Never forward the
+                # secret-bearing POST to arbitrary redirects or sign-in pages.
+                if response.status_code in (302, 303):
+                    location = response.headers.get("location", "")
+                    target = httpx.URL(location)
+                    if target.scheme != "https" or target.host != "script.googleusercontent.com":
+                        raise IntegrationError("SHEETS_WEBHOOK_INVALID_REDIRECT")
+                    response = client.get(location)
             if response.is_error:
                 raise IntegrationError(f"SHEETS_WEBHOOK_HTTP_{response.status_code}")
+            try:
+                ack = response.json()
+            except ValueError:
+                raise IntegrationError("SHEETS_WEBHOOK_INVALID_RESPONSE") from None
+            if not isinstance(ack, dict) or ack.get("status") != "ok" or ack.get("id") != values[0]:
+                raise IntegrationError("SHEETS_WEBHOOK_NOT_ACKNOWLEDGED")
             return
         sheet_id = quote(self.settings.sheets_spreadsheet_id, safe="")
         token = self.settings.sheets_access_token.get_secret_value()

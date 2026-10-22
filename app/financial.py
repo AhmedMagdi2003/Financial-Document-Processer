@@ -135,46 +135,6 @@ def find_duplicates(session, candidate, document_id):
                     if left.isdisjoint(right):
                         continue
             matches.append(other.document_id)
-    # Also compare unconfirmed candidates: duplicate checks must not wait for the
-    # first receipt to enter the expense tracker. State is indexed; the small
-    # pending queue is compared in Python without making JSON provider-specific.
-    pending = session.scalars(
-        select(Document).where(
-            Document.id != document_id, Document.state.in_(["READY_TO_RECORD", "NEEDS_REVIEW"])
-        )
-    ).all()
-    for other_doc in pending:
-        if not other_doc.candidate:
-            continue
-        other = Candidate.model_validate(other_doc.candidate)
-        if normalized(other.vendor) != vendor:
-            continue
-        same_number = (
-            candidate.document_number
-            and other.document_number
-            and normalized(candidate.document_number) == normalized(other.document_number)
-        )
-        same_purchase = (
-            candidate.grand_total is not None
-            and candidate.currency is not None
-            and candidate.date is not None
-            and candidate.date == other.date
-            and candidate.grand_total == other.grand_total
-            and candidate.currency == other.currency
-        )
-        if not same_number and not same_purchase:
-            continue
-        if not same_number and candidate.items and other.items:
-            if (
-                    candidate.document_number
-                    and other.document_number
-                    and candidate.document_number != other.document_number
-                ):
-                left = {normalized(item.description) for item in candidate.items}
-                right = {normalized(item.description) for item in other.items}
-                if left.isdisjoint(right):
-                    continue
-        matches.append(other_doc.id)
     return list(dict.fromkeys(matches))
 
 
@@ -232,6 +192,13 @@ def upload(session, settings, data, filename, project_id, actor, key=None):
             return session.get(Document, prior.document_id), False
     existing = session.scalar(select(Document).where(Document.sha256 == sha))
     if existing:
+        if existing.state in {"FAILED", "DISMISSED"}:
+            Storage(settings).put(existing.storage_key, data, inspection.mime)
+            existing.state = "RECEIVED"
+            existing.error_code = None
+            existing.version += 1
+            session.commit()
+            return existing, True
         if key:
             session.add(Idempotency(key=key, fingerprint=fingerprint, document_id=existing.id))
             session.commit()
@@ -633,3 +600,68 @@ def sync_sheets(session, settings, expense_id, transport=None):
     )
     session.commit()
     return delivery
+
+def create_category(session, name, definition, id=None, active=True, actor="reviewer"):
+    cat_id = (id or "").strip()
+    if not cat_id:
+        cat_id = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+    if not cat_id:
+        cat_id = uid()[:8]
+    existing = session.get(Category, cat_id)
+    if existing:
+        raise Conflict(f"Category with ID '{cat_id}' already exists")
+    category = Category(id=cat_id, name=name.strip(), definition=definition.strip(), active=active)
+    session.add(category)
+    emit(session, "human", "create_category", "succeeded", actor=actor, category_id=cat_id)
+    session.commit()
+    return category
+
+
+def delete_expense(session, expense_id, actor="reviewer"):
+    expense = session.get(Expense, expense_id)
+    if not expense:
+        return False
+    doc_id = expense.document_id
+    for delivery in session.scalars(select(Delivery).where(Delivery.expense_id == expense.id)).all():
+        session.delete(delivery)
+    session.delete(expense)
+    if doc_id:
+        doc = session.get(Document, doc_id)
+        if doc:
+            unresolved = session.scalars(
+                select(Issue).where(
+                    Issue.document_id == doc.id,
+                    Issue.resolution.is_(None),
+                    Issue.severity.in_(["blocking", "review"]),
+                )
+            ).all()
+            doc.state = "NEEDS_REVIEW" if unresolved else "READY_TO_RECORD"
+            doc.version += 1
+    emit(session, "human", "delete_expense", "deleted", resource_id=expense_id, actor=actor)
+    session.commit()
+    return True
+
+
+def delete_document(session, settings, document_id, actor="reviewer"):
+    doc = session.get(Document, document_id)
+    if not doc:
+        return False
+    for exp in session.scalars(select(Expense).where(Expense.document_id == doc.id)).all():
+        for deliv in session.scalars(select(Delivery).where(Delivery.expense_id == exp.id)).all():
+            session.delete(deliv)
+        session.delete(exp)
+    for issue in session.scalars(select(Issue).where(Issue.document_id == doc.id)).all():
+        session.delete(issue)
+    for attempt in session.scalars(select(Attempt).where(Attempt.document_id == doc.id)).all():
+        session.delete(attempt)
+    for idemp in session.scalars(select(Idempotency).where(Idempotency.document_id == doc.id)).all():
+        session.delete(idemp)
+    try:
+        if doc.storage_key:
+            Storage(settings).delete(doc.storage_key)
+    except Exception:
+        pass
+    session.delete(doc)
+    emit(session, "human", "delete_document", "deleted", resource_id=document_id, actor=actor)
+    session.commit()
+    return True

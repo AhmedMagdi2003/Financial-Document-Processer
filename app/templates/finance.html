@@ -37,7 +37,8 @@
 <p>Select a project and upload one or multiple invoices/receipts. Valid documents record automatically.</p>
 <form id="upload-form">
 <label for="project">Project</label>
-<select id="project" name="project_id" required>{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
+<select id="project" name="project_id" required><option value="" disabled {{ 'selected' if not filters.project }}>Choose a project</option>{% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if filters.project == p.id }}>{{ p.name }}</option>{% endfor %}</select>
+<p class="form-note"><a href="/projects">Manage projects</a> · <a href="/integrations">Connect Google Drive, Sheets or Zapier</a></p>
 <label class="dropzone" for="file">
 <span class="upload-icon">↑</span>
 <strong>Choose invoices or receipts (multiple supported)</strong>
@@ -95,13 +96,57 @@
 <small>Unconfigured integrations stay pending. Your confirmed records remain in this workspace.</small>
 </section>
 </div>
+
+<!-- Visual Analytics & Tracing Charts -->
+<div class="page-heading" style="margin-top:20px;">
+  <div>
+    <p class="eyebrow" style="color:var(--teal);">ANALYTICS & TRACINGS</p>
+    <h2>Visual Trends & Expense Analytics</h2>
+  </div>
+</div>
+
+<div class="grid equal" style="margin-bottom: 24px;">
+  <section class="panel">
+    <div class="panel-title">
+      <h2>Spend Over Time</h2>
+      <span class="tag">Timeline Bar Chart</span>
+    </div>
+    <p class="muted">Monthly confirmed expenditure timeline.</p>
+    <div style="position:relative; height:240px; width:100%;">
+      <canvas id="chart-timeline"></canvas>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">
+      <h2>Spend by Category</h2>
+      <span class="tag">Category Breakdown</span>
+    </div>
+    <p class="muted">Expense distribution by taxonomy category.</p>
+    <div style="position:relative; height:240px; width:100%;">
+      <canvas id="chart-categories"></canvas>
+    </div>
+  </section>
+</div>
+
+<section class="panel" style="margin-bottom: 24px;">
+  <div class="panel-title">
+    <h2>Ingestion & Pipeline Tracing</h2>
+    <span class="tag">Pipeline Tracings</span>
+  </div>
+  <p class="muted">Real-time status breakdown of documents through the ingestion and verification pipeline.</p>
+  <div style="position:relative; height:180px; width:100%;">
+    <canvas id="chart-pipeline"></canvas>
+  </div>
+</section>
+
 <section class="panel">
 <div class="panel-title">
 <div>
 <p class="eyebrow">CONFIRMED RECORDS</p>
 <h2>Expense tracker</h2>
 </div>
-<span class="tag">{{ summary.count }} records</span>
+<span class="tag" id="expense-count-tag">{{ summary.count }} records</span>
 </div>
 <form class="filters" method="get">
 <label>Project<select name="project">
@@ -128,10 +173,10 @@
 <th>Category</th>
 <th>Date</th>
 <th class="number">Amount</th>
-<th>Record</th>
+<th>Actions</th>
 </tr>
 </thead>
-<tbody>{% for e in records %}<tr>
+<tbody id="expense-table-body">{% for e in records %}<tr id="expense-row-{{ e.id }}">
 <td>
 <strong>{{ e.vendor or 'Vendor unknown' }}</strong>
 <small class="cell-note">{{ e.description }}</small>
@@ -142,8 +187,9 @@
 <td class="number">
 <strong>{{ e.total }} {{ e.currency }}</strong>
 </td>
-<td>
-<a href="/documents/{{ e.document_id }}">View ↗</a>
+<td style="display:flex; gap:6px; align-items:center;">
+<a href="/documents/{{ e.document_id }}" class="button secondary" style="padding:4px 8px; font-size:12px;">View ↗</a>
+<button type="button" class="danger" data-delete-expense="{{ e.id }}" style="padding:4px 8px; font-size:12px;" title="Delete expense record from database">Delete</button>
 </td>
 </tr>{% else %}<tr>
 <td colspan="6" class="empty">No confirmed expenses match these filters. Upload and confirm a document to get started.</td>
@@ -151,9 +197,10 @@
 </table>
 </div>
 </section>
+
 <div class="grid equal">
 <section class="panel">
-<h2>Spend by category</h2>
+<h2>Spend by category (table)</h2>
 <p class="muted">Select one currency above to focus the distribution. Every currency stays separate.</p>{% for c in summary.categories %}<div class="distribution">
 <span>{{ c.category|title }} <small>{{ c.currency }}</small>
 </span>
@@ -162,7 +209,7 @@
 <meter value="{{ c.total }}" max="{{ summary.totals[c.currency] }}" aria-label="{{ c.category }} {{ c.currency }}">
 </meter>{% else %}<p class="empty">Category distribution appears after confirmation.</p>{% endfor %}</section>
 <section class="panel">
-<h2>Spend over time</h2>
+<h2>Spend over time (table)</h2>
 <p class="muted">Document month · confirmed expenses</p>{% for t in summary.timeline %}<div class="distribution">
 <span>{{ t.month }} <small>{{ t.currency }}</small>
 </span>
@@ -171,4 +218,11 @@
 <meter value="{{ t.total }}" max="{{ summary.totals[t.currency] }}" aria-label="{{ t.month }} {{ t.currency }}">
 </meter>{% else %}<p class="empty">Your monthly spending will appear here.</p>{% endfor %}</section>
 </div>
+
+<script id="finance-chart-data" type="application/json">
+{
+  "summary": {{ summary|tojson }},
+  "pipeline": {{ pipeline_stats|tojson }}
+}
+</script>
 {% endblock %}

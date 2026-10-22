@@ -12,7 +12,7 @@ from app.web import create_app
 
 
 def test_benchmark_suite_100_percent_compliance(tmp_path):
-    root_dir = Path("D:/Financial-Document-Processer")
+    root_dir = Path(__file__).resolve().parent.parent
     test_dir = root_dir / "financial_agent_test"
     docs_dir = test_dir / "upload_these_documents"
 

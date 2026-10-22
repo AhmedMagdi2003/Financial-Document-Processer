@@ -220,6 +220,95 @@ document.querySelectorAll('[data-review-action]').forEach(button =>
   })
 );
 
+// Delete Expense Handler
+document.querySelectorAll('[data-delete-expense]').forEach(button => {
+  button.addEventListener('click', async () => {
+    const id = button.dataset.deleteExpense;
+    if (!confirm('Are you sure you want to delete this expense record from the database?')) return;
+    button.disabled = true;
+    try {
+      await api(`/api/v1/expenses/${id}`, 'DELETE');
+      notice('Expense record deleted successfully.');
+      const row = document.querySelector(`#expense-row-${id}`);
+      if (row) row.remove();
+      const countTag = document.querySelector('#expense-count-tag');
+      if (countTag) {
+        const rows = document.querySelectorAll('#expense-table-body tr');
+        countTag.textContent = `${rows.length} records`;
+      }
+    } catch (err) {
+      notice(err.message, true);
+      button.disabled = false;
+    }
+  });
+});
+
+// Delete Document Handler
+document.querySelectorAll('[data-delete-document]').forEach(button => {
+  button.addEventListener('click', async () => {
+    const id = button.dataset.deleteDocument;
+    if (!confirm('Are you sure you want to permanently delete this document and all its records from the database?')) return;
+    button.disabled = true;
+    try {
+      await api(`/api/v1/documents/${id}`, 'DELETE');
+      notice('Document deleted successfully.');
+      const row = document.querySelector(`#review-row-${id}`);
+      if (row) {
+        row.remove();
+      } else {
+        setTimeout(() => {
+          location.href = '/review';
+        }, 500);
+      }
+    } catch (err) {
+      notice(err.message, true);
+      button.disabled = false;
+    }
+  });
+});
+
+// Add New Category Handler
+const newCategoryForm = document.querySelector('#new-category-form');
+if (newCategoryForm) {
+  newCategoryForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const btn = newCategoryForm.querySelector('button[type=submit]');
+    if (btn) btn.disabled = true;
+    const fd = new FormData(newCategoryForm);
+    const name = fd.get('name')?.trim();
+    const id = fd.get('id')?.trim() || undefined;
+    const definition = fd.get('definition')?.trim();
+    const active = fd.has('active');
+    try {
+      await api('/api/v1/categories', 'POST', { name, id, definition, active });
+      notice('New category created successfully!');
+      setTimeout(() => location.reload(), 600);
+    } catch (err) {
+      notice(err.message, true);
+      if (btn) btn.disabled = false;
+    }
+  });
+}
+
+// Delete Category Handler
+document.querySelectorAll('[data-delete-category]').forEach(button => {
+  button.addEventListener('click', async () => {
+    const id = button.dataset.deleteCategory;
+    if (!confirm(`Are you sure you want to delete category "${id}"?`)) return;
+    button.disabled = true;
+    try {
+      await api(`/api/v1/categories/${id}`, 'DELETE');
+      notice(`Category "${id}" deleted.`);
+      const card = document.querySelector(`#category-card-${id}`);
+      if (card) card.remove();
+    } catch (err) {
+      notice(err.message, true);
+      button.disabled = false;
+    }
+  });
+});
+
+// Existing Category Form Edit Handler
 document.querySelectorAll('.category-form').forEach(form =>
   action(form, async data => {
     await api(`/api/v1/categories/${form.dataset.id}`, 'PATCH', {
@@ -235,3 +324,143 @@ document.querySelector('#logout')?.addEventListener('click', async () => {
   await api('/logout');
   location.href = '/login';
 });
+
+// Chart initialization for Financial Analytics & Pipeline Tracing
+function initFinanceCharts() {
+  const chartScript = document.querySelector('#finance-chart-data');
+  if (!chartScript || typeof Chart === 'undefined') return;
+
+  try {
+    const { summary, pipeline } = JSON.parse(chartScript.textContent);
+
+    // 1. Spend Over Time Chart
+    const timelineEl = document.querySelector('#chart-timeline');
+    if (timelineEl && summary && summary.timeline) {
+      const labels = summary.timeline.map(t => t.month);
+      const values = summary.timeline.map(t => parseFloat(t.total) || 0);
+      new Chart(timelineEl, {
+        type: 'bar',
+        data: {
+          labels: labels.length ? labels : ['No Data'],
+          datasets: [{
+            label: 'Confirmed Spend',
+            data: values.length ? values : [0],
+            backgroundColor: '#1e6255',
+            borderRadius: 6,
+            hoverBackgroundColor: '#2d8474',
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` Spend: ${ctx.parsed.y.toFixed(2)}`,
+              },
+            },
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: { color: '#e0e6df' },
+              ticks: { color: '#677873' },
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#677873' },
+            },
+          },
+        },
+      });
+    }
+
+    // 2. Spend by Category Chart
+    const catEl = document.querySelector('#chart-categories');
+    if (catEl && summary && summary.categories) {
+      const catLabels = summary.categories.map(c => c.category);
+      const catValues = summary.categories.map(c => parseFloat(c.total) || 0);
+      const colors = ['#1e6255', '#2563eb', '#0d9488', '#d97706', '#16a34a', '#8b5cf6', '#ec4899', '#64748b'];
+
+      new Chart(catEl, {
+        type: 'doughnut',
+        data: {
+          labels: catLabels.length ? catLabels : ['Uncategorized'],
+          datasets: [{
+            data: catValues.length ? catValues : [0],
+            backgroundColor: colors.slice(0, Math.max(1, catLabels.length)),
+            borderWidth: 2,
+            borderColor: '#ffffff',
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: { boxWidth: 12, color: '#173c39', font: { size: 12 } },
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` ${ctx.label}: ${ctx.parsed.toFixed(2)}`,
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // 3. Document Pipeline Tracing Chart
+    const pipelineEl = document.querySelector('#chart-pipeline');
+    if (pipelineEl && pipeline) {
+      new Chart(pipelineEl, {
+        type: 'bar',
+        data: {
+          labels: ['Recorded ✅', 'Ready to Record ⏱', 'Needs Review ⚠️', 'Failed ❌', 'Duplicates 📑', 'Dismissed 🚫'],
+          datasets: [{
+            label: 'Document Count',
+            data: [
+              pipeline.recorded || 0,
+              pipeline.ready || 0,
+              pipeline.review || 0,
+              pipeline.failed || 0,
+              pipeline.duplicates || 0,
+              pipeline.dismissed || 0,
+            ],
+            backgroundColor: ['#16a34a', '#2563eb', '#d97706', '#dc2626', '#f59e0b', '#64748b'],
+            borderRadius: 6,
+          }],
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: { stepSize: 1, color: '#677873' },
+              grid: { color: '#e0e6df' },
+            },
+            y: {
+              grid: { display: false },
+              ticks: { color: '#173c39', font: { weight: '600' } },
+            },
+          },
+        },
+      });
+    }
+  } catch (e) {
+    console.error('Failed to initialize charts:', e);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initFinanceCharts);
+} else {
+  initFinanceCharts();
+}

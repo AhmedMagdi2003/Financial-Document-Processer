@@ -182,11 +182,14 @@ def test_sheets_webhook_sync(runtime):
     """Google Sheets sync supports webhook dispatch."""
     cfg, app, client = runtime
     cfg.sheets_webhook_url = "https://example.com/webhook"
+    from pydantic import SecretStr
+    cfg.sheets_webhook_secret = SecretStr("test-secret-at-least-24-characters")
 
     recorded_payloads = []
     def handler(request: httpx.Request):
         recorded_payloads.append(request.read())
-        return httpx.Response(200, json={"status": "ok"})
+        import json
+        return httpx.Response(200, json={"status": "ok", "id": json.loads(request.read())["values"][0]})
 
     transport = httpx.MockTransport(handler)
 

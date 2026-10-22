@@ -82,3 +82,10 @@ class CategoryInput(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     definition: str = Field(min_length=10, max_length=2000)
     active: bool
+
+
+class CategoryCreate(BaseModel):
+    id: str | None = Field(default=None, max_length=80)
+    name: str = Field(min_length=1, max_length=200)
+    definition: str = Field(min_length=5, max_length=2000)
+    active: bool = True

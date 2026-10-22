@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: impact-financial-processor
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install uv && uv sync --frozen
+    startCommand: uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.14
+      - key: MODE
+        value: cloud
+      - key: HOSTING_PROVIDER
+        value: render
+      - key: SECURE_COOKIES
+        value: "false"
+      - key: AUTO_RECORD
+        value: "true"
+      - key: REVIEWER_TOKEN
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: PROVIDER
+        value: gemini
+      - key: MODEL_NAME
+        value: gemini-2.0-flash
+      - key: INPUT_USD_PER_MILLION
+        value: "0.10"
+      - key: OUTPUT_USD_PER_MILLION
+        value: "0.40"
+      - key: PRICING_SOURCE_URL
+        value: "https://ai.google.dev/pricing"
+      - key: PRICING_CHECKED_AT
+        value: "2026-10-21"

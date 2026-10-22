@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Projects{% endblock %}{% block crumb %}Projects{% endblock %}
+{% block body %}
+<script src="/static/projects.js" defer></script>
+<div class="page-heading"><div><p class="eyebrow">PROJECT WORKSPACE</p>
+<h1>Put every expense in the right project.</h1>
+<p>Create your real projects, then choose one before uploading. Project IDs are also used by Drive and Zapier.</p></div></div>
+<section class="panel"><h2>Create a project</h2>
+<form id="create-project" class="filters">
+<label>Project name<input name="name" required maxlength="200" placeholder="Community Water Programme"></label>
+<label>Permanent project ID<input name="id" required maxlength="80" pattern="[a-z0-9]+([-_][a-z0-9]+)*" placeholder="community-water" aria-describedby="project-id-help"></label>
+<button>Create project</button></form>
+<p id="project-id-help" class="muted">Use lowercase letters, numbers, hyphens or underscores. The ID stays fixed so existing expenses and integrations keep working.</p></section>
+<section class="panel"><div class="panel-title"><h2>Your projects</h2><span class="tag">{{ projects|length }} projects</span></div>
+<p>Open a project to filter the tracker and preselect it for new uploads. You can change the project on each upload.</p>
+{% for p in projects %}
+<form class="project-form filters" data-id="{{ p.id }}">
+<label class="grow">Project name<input name="name" value="{{ p.name }}" required maxlength="200"></label>
+<div><small class="cell-note">Integration project ID</small><code>{{ p.id }}</code></div>
+<button class="secondary">Save name</button><a class="button" href="/?project={{ p.id|urlencode }}">Open project →</a>
+</form>
+{% else %}<p class="empty">Create your first project above to start organizing expenses.</p>{% endfor %}</section>
+{% endblock %}
