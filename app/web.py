@@ -24,6 +24,7 @@ from app.ai import ProviderError
 from app.config import Settings
 from app.db import make_engine, query_metrics
 from app.errors import map_error
+from app.exchange_rates import latest_rates
 from app.inspection import FileRejected
 from app.integrations import IntegrationError, Storage
 from app.models import (
@@ -33,6 +34,7 @@ from app.models import (
     Delivery,
     Document,
     Event,
+    Expense,
     Issue,
     Project,
     Usage,
@@ -264,6 +266,7 @@ def create_app(settings=None, engine=None):
             csrf=request.session.get("csrf", ""),
             reviewer=request.session.get("reviewer", ""),
             path=request.url.path,
+            report_currency=request.query_params.get("report_currency", "USD").upper(),
         )
         return templates.TemplateResponse(request, template, context)
 
@@ -275,6 +278,7 @@ def create_app(settings=None, engine=None):
         project: str = "",
         category: str = "",
         currency: str = "",
+        report_currency: str = "USD",
         start: str = "",
         end: str = "",
         sort_by: str = "added",
@@ -282,6 +286,9 @@ def create_app(settings=None, engine=None):
     ):
         if not request.session.get("reviewer"):
             return RedirectResponse("/login", 303)
+        report_currency = report_currency.upper()
+        if report_currency not in {"USD", "EUR", "EGP"}:
+            report_currency = "USD"
         with page_session(request) as session:
             records = financial.expenses(
                 session,
@@ -303,6 +310,11 @@ def create_app(settings=None, engine=None):
                 ).all()
             )
             summ = financial.summary(records)
+            source_currencies = sorted({e.currency for e in records if e.currency})
+            available_currencies = sorted(
+                {"USD", "EUR", "EGP"}
+                | {e.currency for e in session.scalars(select(Expense)).all() if e.currency}
+            )
             pipeline_stats = {
                 "recorded": sum(1 for d in documents if d.state == "RECORDED"),
                 "review": sum(1 for d in documents if d.state == "NEEDS_REVIEW"),
@@ -316,12 +328,26 @@ def create_app(settings=None, engine=None):
                 "finance.html",
                 records=records,
                 summary=summ,
+                report_currency=report_currency,
+                report_currencies=["USD", "EUR", "EGP"],
+                source_currencies=source_currencies,
+                expense_conversion_data=[
+                    {
+                        "id": e.id,
+                        "amount": str(e.total),
+                        "currency": e.currency,
+                        "category": e.category_id or "unknown",
+                        "month": (e.date or "unknown")[:7],
+                    }
+                    for e in records
+                ],
                 projects=session.scalars(select(Project)).all(),
                 categories=session.scalars(select(Category)).all(),
                 documents=documents,
                 deliveries=deliveries,
                 duplicate_count=duplicate_count,
                 pipeline_stats=pipeline_stats,
+                available_currencies=available_currencies,
                 filters=dict(
                     project=project,
                     category=category,
@@ -378,7 +404,10 @@ def create_app(settings=None, engine=None):
             selected_project = session.get(Project, project) if project else None
             if project and not selected_project:
                 raise HTTPException(404, "Project not found")
+            include_http = request.query_params.get("include_http") == "true"
             query = select(Event).order_by(Event.timestamp.desc()).limit(200)
+            if not include_http and not q:
+                query = query.where(Event.stage.not_in(["http", "database"]))
             project_docs = select(Document.id).where(Document.project_id == project)
             project_runs = select(Attempt.run_id).where(Attempt.document_id.in_(project_docs))
             if project:
@@ -425,6 +454,7 @@ def create_app(settings=None, engine=None):
                 "status_labels": list(status_counts.keys()),
                 "status_values": list(status_counts.values()),
             }
+            doc_map = {d.id: d.filename for d in all_documents}
             return render(
                 request,
                 "operations.html",
@@ -433,6 +463,8 @@ def create_app(settings=None, engine=None):
                 costs=cost_summary(usage_rows),
                 stats=operations_stats,
                 dashboard=dashboard,
+                doc_map=doc_map,
+                include_http=include_http,
                 projects=session.scalars(select(Project).order_by(Project.name)).all(),
                 project_id=project,
                 selected_project=selected_project,
@@ -522,7 +554,6 @@ def create_app(settings=None, engine=None):
                     "issues": [],
                     "human_error": err.to_dict(),
                     "status": "error",
-                    "detail": str(exc),
                 })
         return {
             "total": len(results),
@@ -618,6 +649,13 @@ def create_app(settings=None, engine=None):
         session: DB, actor: Actor, project: str = "", category: str = "", currency: str = ""
     ):
         return financial.summary(financial.expenses(session, project, category, currency))
+
+    @application.get("/api/v1/exchange-rates")
+    def exchange_rates(actor: Actor, base: str, symbols: str = ""):
+        try:
+            return latest_rates(base, symbols.split(",") if symbols else [])
+        except (httpx.HTTPError, ValueError) as exc:
+            raise HTTPException(503, "Exchange rates are temporarily unavailable") from exc
 
     @application.get("/api/v1/expenses.csv")
     def export(

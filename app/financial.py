@@ -355,6 +355,8 @@ def process(session, settings, document_id, actor="demo-reviewer", provider=None
     except Exception as exc:
         document.state, attempt.status = "FAILED", "failed"
         document.error_code = str(exc) if isinstance(exc, ProviderError) else "PROCESSING_FAILED"
+        cause = getattr(exc, "__cause__", None) or exc
+        attempt.reason = f"{document.error_code}: {type(cause).__name__} - {str(cause)[:250]}"
     if auto_record is None:
         auto_record = getattr(settings, "auto_record", False)
     if auto_record and document.state == "READY_TO_RECORD":
@@ -368,6 +370,7 @@ def process(session, settings, document_id, actor="demo-reviewer", provider=None
         resource_id=document.id,
         duration_ms=int((perf_counter() - started) * 1000),
         error_code=document.error_code,
+        error_detail=attempt.reason if document.state == "FAILED" else None,
         llm_calls=getattr(provider, "calls", 0),
         fixture=settings.provider == "fixture",
     )
@@ -529,22 +532,40 @@ def expenses(
 
 def summary(records):
     totals, categories, timeline = {}, {}, {}
+    currencies = {expense.currency for expense in records if expense.currency}
+    single_currency = next(iter(currencies), None) if len(currencies) == 1 else None
     for expense in records:
         currency = expense.currency
         totals[currency] = totals.get(currency, Decimal("0")) + expense.total
-        key = (currency, expense.category_id or "unknown")
+        key = (expense.category_id or "unknown",) if single_currency else (
+            currency, expense.category_id or "unknown"
+        )
         categories[key] = categories.get(key, Decimal("0")) + expense.total
         month = (expense.date or "unknown")[:7]
-        key = (currency, month)
+        key = (month,) if single_currency else (currency, month)
         timeline[key] = timeline.get(key, Decimal("0")) + expense.total
+    if single_currency:
+        category_rows = [
+            {"currency": single_currency, "category": k[0], "total": str(v)}
+            for k, v in categories.items()
+        ]
+        timeline_rows = [
+            {"currency": single_currency, "month": k[0], "total": str(v)}
+            for k, v in sorted(timeline.items())
+        ]
+    else:
+        category_rows = [
+            {"currency": c, "category": k, "total": str(v)}
+            for (c, k), v in categories.items()
+        ]
+        timeline_rows = [
+            {"currency": c, "month": k, "total": str(v)}
+            for (c, k), v in sorted(timeline.items())
+        ]
     return {
         "totals": {key: str(value) for key, value in totals.items()},
-        "categories": [
-            {"currency": c, "category": k, "total": str(v)} for (c, k), v in categories.items()
-        ],
-        "timeline": [
-            {"currency": c, "month": k, "total": str(v)} for (c, k), v in sorted(timeline.items())
-        ],
+        "categories": category_rows,
+        "timeline": timeline_rows,
         "count": len(records),
     }
 

@@ -5,31 +5,248 @@
 <link rel="stylesheet" href="/static/operations.css">
 <script src="/static/operations.js" defer></script>
 <div class="ops-dashboard">
-<div class="page-heading"><div><p class="eyebrow">OPERATIONS CENTER</p><h1>Processing, at a glance.</h1><p>Monitor document flow, investigate activity and understand model spend.</p></div><a class="button" href="/review{% if project_id %}?project={{ project_id|urlencode }}{% endif %}">Open review queue</a></div>
-{% include 'ops_metrics.html' %}
-<section class="panel"><form class="filters" method="get">
-<label>Expense project<select name="project"><option value="">All projects</option>{% for project in projects %}<option value="{{ project.id }}" {% if project.id == project_id %}selected{% endif %}>{{ project.name }}</option>{% endfor %}</select></label>
-<label class="grow">Investigate a run, request or document<input name="q" value="{{ q }}" placeholder="Enter an exact correlation ID"></label><button>Find activity</button><a href="/operations{% if project_id %}?project={{ project_id|urlencode }}{% endif %}">Reset search</a>
-</form><p class="ops-scope">Activity charts show the latest {{ events|length }} matching events (maximum 200). Model usage follows the correlation search. All dates and times are UTC.</p></section>
-<div class="ops-chart-grid">
-<section class="panel"><div class="ops-panel-heading"><h2>Document pipeline</h2><span class="tag">DOCUMENTS</span></div><p class="ops-scope">Current document states in this project scope.</p><div class="ops-bars">
-{% for row in dashboard.states %}<div class="ops-bar"><div><span>{{ row.label|replace('_',' ')|lower }}</span><strong>{{ row.value }}</strong></div><meter min="0" max="{{ row.maximum }}" value="{{ row.value }}" aria-label="{{ row.label }}: {{ row.value }} documents">{{ row.value }}</meter></div>{% else %}<p class="empty">Upload a document to see the pipeline.</p>{% endfor %}
-</div></section>
-<section class="panel"><div class="ops-panel-heading"><h2>Activity by day</h2><span class="tag">EVENTS</span></div><p class="ops-scope">Counts within the recent event sample; not total daily throughput.</p><div class="ops-bars ops-scroll-chart">
-{% for row in dashboard.daily_events %}<div class="ops-bar"><div><span>{{ row.label }}</span><strong>{{ row.value }}</strong></div><meter min="0" max="{{ row.maximum }}" value="{{ row.value }}" aria-label="{{ row.label }}: {{ row.value }} events">{{ row.value }}</meter></div>{% else %}<p class="empty">No activity matches this scope.</p>{% endfor %}
-</div></section>
-<section class="panel"><div class="ops-panel-heading"><h2>Processing stages</h2><span class="tag">EVENTS</span></div><p class="ops-scope">Where activity occurs in the recent event sample.</p><div class="ops-bars">
-{% for row in dashboard.stages %}<div class="ops-bar"><div><span>{{ row.label|replace('_',' ') }}</span><strong>{{ row.value }}</strong></div><meter min="0" max="{{ row.maximum }}" value="{{ row.value }}" aria-label="{{ row.label }}: {{ row.value }} events">{{ row.value }}</meter></div>{% else %}<p class="empty">Processing stages appear after the first run.</p>{% endfor %}
-</div></section>
-<section class="panel"><div class="ops-panel-heading"><h2>Estimated model spend</h2><span class="tag">USD</span></div><p class="ops-cost">${{ '%.4f'|format(dashboard.known_cost) }} <span>known estimates</span></p><p class="ops-scope">{{ dashboard.unknown_cost_calls }} calls with unknown cost. Estimates may be partial and are not provider invoices.</p><div class="ops-bars">
-{% for row in dashboard.provider_costs %}<div class="ops-bar"><div><span>{{ row.label }}</span><strong>${{ '%.4f'|format(row.known) }}</strong></div><meter min="0" max="{{ row.maximum }}" value="{{ row.known }}" aria-label="{{ row.label }}: {{ row.known }} known estimated USD">{{ row.known }}</meter><small>{{ row.calls }} calls · {{ row.unknown }} unknown costs</small></div>{% else %}<p class="empty">No model usage recorded. Fixture runs do not call a provider.</p>{% endfor %}
-</div></section>
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">OPERATIONS CENTER</p>
+    <h1>Processing, at a glance.</h1>
+    <p>Monitor document flow, investigate activity and understand model spend.</p>
+  </div>
+  <a class="button" href="/review{% if project_id %}?project={{ project_id|urlencode }}{% endif %}">Open review queue</a>
 </div>
-<section class="panel"><div class="ops-panel-heading"><div><h2>Activity timeline</h2><p class="ops-scope">Filter this feed without changing the charts above.</p></div><span class="tag" id="ops-event-count" role="status">{{ events|length }} events</span></div>
-<div class="ops-feed-filters"><label>Stage<select id="ops-stage"><option value="">All stages</option>{% for row in dashboard.stages %}<option value="{{ row.label }}">{{ row.label }}</option>{% endfor %}</select></label><label>Status<select id="ops-status"><option value="">All statuses</option>{% for status in dashboard.event_statuses %}<option value="{{ status }}">{{ status }}</option>{% endfor %}</select></label></div>
-<div id="ops-events">{% for event in events %}<article class="event ops-event" data-stage="{{ event.stage or 'Unspecified' }}" data-status="{{ event.status }}"><span class="event-dot"></span><div><strong>{{ event.operation|replace('_',' ') }}</strong> <span class="tag">{{ event.status }}</span><p>{{ event.stage }} · <time>{{ event.timestamp }}</time>{% if event.duration_ms is not none %} · {{ event.duration_ms }} ms{% endif %}</p>{% if event.error_code %}<p class="error-text">{{ event.error_code }}</p>{% endif %}<details><summary>Correlation & measurements</summary><dl class="ops-correlation"><dt>Run</dt><dd>{{ event.run_id or '—' }}</dd><dt>Request</dt><dd>{{ event.request_id or '—' }}</dd><dt>Resource</dt><dd>{{ event.resource_id or '—' }}</dd></dl><pre>{{ event.safe_metadata|tojson(indent=2) }}</pre></details></div></article>{% else %}<p class="empty">No matching activity. Try another correlation ID or reset the search.</p>{% endfor %}</div><p class="empty" id="ops-no-events" hidden>No events match these stage and status filters.</p>
+
+{% include 'ops_metrics.html' %}
+
+<section class="panel">
+  <form class="filters" method="get">
+    <label>Expense project
+      <select name="project">
+        <option value="">All projects</option>
+        {% for project in projects %}
+          <option value="{{ project.id }}" {% if project.id == project_id %}selected{% endif %}>{{ project.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="grow">Investigate a run, request or document
+      <input name="q" value="{{ q }}" placeholder="Enter an exact correlation ID or document ID">
+    </label>
+    <button>Find activity</button>
+    <a href="/operations{% if project_id %}?project={{ project_id|urlencode }}{% endif %}">Reset search</a>
+  </form>
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+    <p class="ops-scope" style="margin:0;">Showing ordered operational events (maximum 200). Model usage follows the correlation search. UTC timestamps.</p>
+    <form method="get" style="display:inline-flex; align-items:center; gap:6px; font-size:12px;">
+      {% if project_id %}<input type="hidden" name="project" value="{{ project_id }}">{% endif %}
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+      <label style="display:inline-flex; align-items:center; gap:6px; font-weight:normal; cursor:pointer;">
+        <input type="checkbox" name="include_http" value="true" {% if include_http %}checked{% endif %} onchange="this.form.submit()">
+        Show raw HTTP request traces
+      </label>
+    </form>
+  </div>
 </section>
-<section class="panel"><details><summary>Model usage ledger · {{ usage|length }} calls</summary><p class="ops-scope">Unknown cost remains unknown. Reservations are guards, not charges.</p><div class="table-wrap"><table><thead><tr><th>Provider / model</th><th>Operation</th><th>Input / output tokens</th><th>Estimated USD</th><th>Run</th></tr></thead><tbody>{% for u in usage %}<tr><td>{{ u.provider }}<small class="cell-note">{{ u.model }}</small></td><td>{{ u.operation }}</td><td>{{ u.input_tokens if u.input_tokens is not none else 'unknown' }} / {{ u.output_tokens if u.output_tokens is not none else 'unknown' }}</td><td>{{ u.estimated_usd if u.estimated_usd is not none else 'unknown' }}</td><td>{% if u.run_id %}<a href="?q={{ u.run_id|urlencode }}{% if project_id %}&project={{ project_id|urlencode }}{% endif %}">{{ u.run_id[:8] }}…</a>{% else %}—{% endif %}</td></tr>{% else %}<tr><td colspan="5" class="empty">No model calls recorded.</td></tr>{% endfor %}</tbody></table></div></details></section>
-<p class="ops-scope">Trace exporters: {{ tracing }}. Exporter delivery is not verified by this dashboard; internal activity remains available.</p>
+
+<div class="ops-chart-grid">
+  <section class="panel">
+    <div class="ops-panel-heading"><h2>Document pipeline</h2><span class="tag">DOCUMENTS</span></div>
+    <p class="ops-scope">Current document states in this project scope.</p>
+    <div class="ops-bars">
+      {% for row in dashboard.states %}
+        <div class="ops-bar">
+          <div><span>{{ row.label|replace('_',' ')|lower }}</span><strong>{{ row.value }}</strong></div>
+          <meter min="0" max="{{ row.maximum }}" value="{{ row.value }}" aria-label="{{ row.label }}: {{ row.value }} documents">{{ row.value }}</meter>
+        </div>
+      {% else %}
+        <p class="empty">Upload a document to see the pipeline.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="ops-panel-heading"><h2>Activity by day</h2><span class="tag">EVENTS</span></div>
+    <p class="ops-scope">Counts within the recent event sample; not total daily throughput.</p>
+    <div class="ops-bars ops-scroll-chart">
+      {% for row in dashboard.daily_events %}
+        <div class="ops-bar">
+          <div><span>{{ row.label }}</span><strong>{{ row.value }}</strong></div>
+          <meter min="0" max="{{ row.maximum }}" value="{{ row.value }}" aria-label="{{ row.label }}: {{ row.value }} events">{{ row.value }}</meter>
+        </div>
+      {% else %}
+        <p class="empty">No activity matches this scope.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="ops-panel-heading"><h2>Processing stages</h2><span class="tag">EVENTS</span></div>
+    <p class="ops-scope">Where activity occurs in the recent event sample.</p>
+    <div class="ops-bars">
+      {% for row in dashboard.stages %}
+        <div class="ops-bar">
+          <div><span>{{ row.label|replace('_',' ') }}</span><strong>{{ row.value }}</strong></div>
+          <meter min="0" max="{{ row.maximum }}" value="{{ row.value }}" aria-label="{{ row.label }}: {{ row.value }} events">{{ row.value }}</meter>
+        </div>
+      {% else %}
+        <p class="empty">Processing stages appear after the first run.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="ops-panel-heading"><h2>Estimated model spend</h2><span class="tag">USD</span></div>
+    <p class="ops-cost">${{ '%.4f'|format(dashboard.known_cost) }} <span>known estimates</span></p>
+    <p class="ops-scope">{{ dashboard.unknown_cost_calls }} calls with unknown cost. Estimates may be partial and are not provider invoices.</p>
+    <div class="ops-bars">
+      {% for row in dashboard.provider_costs %}
+        <div class="ops-bar">
+          <div><span>{{ row.label }}</span><strong>${{ '%.4f'|format(row.known) }}</strong></div>
+          <meter min="0" max="{{ row.maximum }}" value="{{ row.known }}" aria-label="{{ row.label }}: {{ row.known }} known estimated USD">{{ row.known }}</meter>
+          <small>{{ row.calls }} calls · {{ row.unknown }} unknown costs</small>
+        </div>
+      {% else %}
+        <p class="empty">No model usage recorded. Fixture runs do not call a provider.</p>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+<section class="panel">
+  <div class="ops-panel-heading">
+    <div>
+      <h2>Activity timeline</h2>
+      <p class="ops-scope">Filtered operational events with task execution diagnostics.</p>
+    </div>
+    <span class="tag" id="ops-event-count" role="status">{{ events|length }} events</span>
+  </div>
+
+  <!-- Quick Category Tabs -->
+  <div class="ops-tabs" style="display:flex; gap:8px; margin: 16px 0 12px; flex-wrap:wrap;">
+    <button type="button" class="tab-btn active" data-ops-tab="all" style="padding:6px 14px; font-size:13px; border-radius:20px; border:1px solid #cbd5e1; background:#1e6255; color:#fff; cursor:pointer;">All Operations</button>
+    <button type="button" class="tab-btn" data-ops-tab="failed" style="padding:6px 14px; font-size:13px; border-radius:20px; border:1px solid #fca5a5; background:#fff; color:#b91c1c; cursor:pointer;">⚠️ Failures & Errors</button>
+    <button type="button" class="tab-btn" data-ops-tab="model" style="padding:6px 14px; font-size:13px; border-radius:20px; border:1px solid #cbd5e1; background:#fff; color:#334155; cursor:pointer;">🤖 AI Extractions</button>
+    <button type="button" class="tab-btn" data-ops-tab="human" style="padding:6px 14px; font-size:13px; border-radius:20px; border:1px solid #cbd5e1; background:#fff; color:#334155; cursor:pointer;">👤 Reviewer Actions</button>
+    <button type="button" class="tab-btn" data-ops-tab="integration" style="padding:6px 14px; font-size:13px; border-radius:20px; border:1px solid #cbd5e1; background:#fff; color:#334155; cursor:pointer;">⇄ Deliveries & Sync</button>
+  </div>
+
+  <div class="ops-feed-filters" style="margin-top:8px;">
+    <label>Stage
+      <select id="ops-stage">
+        <option value="">All stages</option>
+        {% for row in dashboard.stages %}<option value="{{ row.label }}">{{ row.label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Status
+      <select id="ops-status">
+        <option value="">All statuses</option>
+        {% for status in dashboard.event_statuses %}<option value="{{ status }}">{{ status }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div id="ops-events">
+    {% for event in events %}
+      {% set is_failed = event.status in ['failed', 'FAILED'] or event.error_code is not none %}
+      <article class="event ops-event" 
+               data-stage="{{ event.stage or 'Unspecified' }}" 
+               data-status="{{ event.status }}"
+               data-failed="{{ 'true' if is_failed else 'false' }}"
+               style="border-left: 4px solid {{ '#ef4444' if is_failed else '#10b981' if event.status in ['succeeded', 'RECORDED'] else '#3b82f6' }};">
+        <span class="event-dot" style="background:{{ '#ef4444' if is_failed else '#10b981' if event.status in ['succeeded', 'RECORDED'] else '#3b82f6' }};"></span>
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <strong>
+              {% if event.stage == 'model' %}🤖 AI {{ event.operation|replace('_',' ')|title }}
+              {% elif event.stage == 'finance' and event.operation == 'route' %}🧭 Layout Routing
+              {% elif event.stage == 'finance' and event.operation == 'process' %}⚙️ Pipeline Processing
+              {% elif event.stage == 'human' %}👤 Reviewer: {{ event.operation|replace('_',' ')|title }}
+              {% elif event.stage == 'integration' %}⇄ Google Sheets: {{ event.operation|replace('_',' ')|title }}
+              {% else %}{{ event.operation|replace('_',' ')|title }}{% endif %}
+            </strong>
+            <span class="tag {{ 'danger' if is_failed else 'success' if event.status in ['succeeded', 'RECORDED'] else '' }}">
+              {{ event.status|upper }}
+            </span>
+          </div>
+
+          <p style="margin:4px 0 6px;">
+            Stage: <strong>{{ event.stage }}</strong> · <time>{{ event.timestamp }}</time>
+            {% if event.duration_ms is not none %} · {{ event.duration_ms }} ms{% endif %}
+          </p>
+
+          {% if event.resource_id and doc_map and event.resource_id in doc_map %}
+          <p style="margin:2px 0 6px; font-size:13px; color:#1e293b;">
+            📄 <strong>Target Document:</strong> <a href="/documents/{{ event.resource_id }}" style="font-weight:600; color:#16675b;">{{ doc_map[event.resource_id] }}</a>
+          </p>
+          {% endif %}
+
+          {% if is_failed %}
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-left:4px solid #ef4444; border-radius:6px; padding:10px 14px; margin:8px 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <strong style="color:#b91c1c; font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">Inside This Task (Failure Diagnostics)</strong>
+              <span style="font-size:11px; font-weight:700; color:#dc2626;">{{ event.error_code or 'FAILED' }}</span>
+            </div>
+            <p style="margin:4px 0 0; color:#991b1b; font-family:ui-monospace, monospace; font-size:12px; word-break:break-word;">
+              {{ event.safe_metadata.get('error_detail') or event.safe_metadata.get('reason') or event.error_code or 'Task failed during execution.' }}
+            </p>
+            {% if event.safe_metadata.get('call') %}
+            <small style="color:#7f1d1d; display:block; margin-top:4px;">Attempt {{ event.safe_metadata.get('call') }} · Duration: {{ event.duration_ms }}ms</small>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          <details style="margin-top:6px;">
+            <summary style="font-size:12px; color:#64748b;">Correlation IDs & payload metadata</summary>
+            <dl class="ops-correlation" style="margin-top:6px;">
+              <dt>Run ID</dt><dd>{{ event.run_id or '—' }}</dd>
+              <dt>Request</dt><dd>{{ event.request_id or '—' }}</dd>
+              <dt>Resource</dt><dd>{{ event.resource_id or '—' }}</dd>
+            </dl>
+            <pre style="margin-top:6px; font-size:11px;">{{ event.safe_metadata|tojson(indent=2) }}</pre>
+          </details>
+        </div>
+      </article>
+    {% else %}
+      <p class="empty">No matching activity. Try another correlation ID or reset the search.</p>
+    {% endfor %}
+  </div>
+  <p class="empty" id="ops-no-events" hidden>No events match these filters.</p>
+</section>
+
+<section class="panel">
+  <details>
+    <summary>Model usage ledger · {{ usage|length }} calls</summary>
+    <p class="ops-scope">Unknown cost remains unknown. Reservations are guards, not charges.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Provider / model</th>
+            <th>Operation</th>
+            <th>Input / output tokens</th>
+            <th>Estimated USD</th>
+            <th>Run</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in usage %}
+            <tr>
+              <td>{{ u.provider }}<small class="cell-note">{{ u.model }}</small></td>
+              <td>{{ u.operation }}</td>
+              <td>{{ u.input_tokens if u.input_tokens is not none else 'unknown' }} / {{ u.output_tokens if u.output_tokens is not none else 'unknown' }}</td>
+              <td>{{ u.estimated_usd if u.estimated_usd is not none else 'unknown' }}</td>
+              <td>
+                {% if u.run_id %}
+                  <a href="?q={{ u.run_id|urlencode }}{% if project_id %}&project={{ project_id|urlencode }}{% endif %}">{{ u.run_id[:8] }}…</a>
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="empty">No model calls recorded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>
+
+<p class="ops-scope">Trace exporters: {{ tracing }}. Internal operational telemetry remains available.</p>
 </div>
 {% endblock %}

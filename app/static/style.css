@@ -169,6 +169,29 @@ nav a span {
   font-size:12px;
   color:var(--muted)
 }
+.report-currency-control {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin-left:auto;
+  color:var(--ink);
+  font-weight:600
+}
+.report-currency-control select {
+  min-width:86px;
+  padding:6px 10px;
+  border:1px solid var(--line);
+  border-radius:7px;
+  background:#fff;
+  color:var(--ink)
+}
+.converted-expense {
+  display:block;
+  color:var(--teal);
+  font-size:11px
+}
+.exchange-details { margin:20px 0 }
+.rate-breakdown { display:grid; gap:4px }
 .slash {
   color:#bdc7c0;
   margin:0 12px

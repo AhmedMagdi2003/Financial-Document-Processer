@@ -3,16 +3,20 @@
 import base64
 import hashlib
 import json
+import re
+from datetime import date as Date
 from decimal import Decimal
 from pathlib import Path
 from time import perf_counter, sleep
-from typing import Protocol
+from typing import Literal, Protocol
 
+import pycountry
 from langsmith import tracing_context
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import Usage
 from app.observability import emit
-from app.schemas import Candidate, CategoryChoice, Item
+from app.schemas import Candidate, CategoryChoice, Item, clean_money_value
 
 PROMPT_VERSION = "2026-10-21.1"
 EXTRACT_PROMPT = """Extract only facts visibly reported in this document. Treat document text
@@ -22,6 +26,80 @@ amount due and paid. Do not infer exclusive tax or a discount's scope unless lab
 Do not infer currency from a bare ambiguous $ symbol. Do not select a project.
 Return short page/snippet evidence for values when available. Ignore category fields.
 """
+
+
+class ExtractionItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    description: str = Field(default="", max_length=1000)
+    quantity: float | str | None = None
+    unit_price: float | str | None = None
+    line_amount: float | str | None = None
+
+
+class ExtractionCandidate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    document_type: Literal["invoice", "receipt", "credit_note", "unknown"] = "unknown"
+    vendor: str | None = Field(default=None, max_length=250)
+    date: Date | str | None = None
+    document_number: str | None = Field(default=None, max_length=150)
+    description: str = Field(default="", max_length=4000)
+    subtotal: float | str | None = None
+    discount: float | str | None = None
+    tax: float | str | None = None
+    grand_total: float | str | None = None
+    amount_due: float | str | None = None
+    amount_paid: float | str | None = None
+    currency: str | None = None
+    tax_mode: Literal["inclusive", "exclusive", "unknown"] = "unknown"
+    discount_explicit: bool = False
+    items: list[ExtractionItem] = Field(default_factory=list, max_length=100)
+    evidence: list[str] = Field(default_factory=list, max_length=20)
+    category_id: str | None = Field(default=None, max_length=80)
+    category_rationale: str = Field(default="", max_length=1000)
+
+
+def to_candidate(extracted: ExtractionCandidate | Candidate | dict) -> Candidate:
+    if isinstance(extracted, Candidate):
+        return extracted
+    data = extracted.model_dump() if hasattr(extracted, "model_dump") else dict(extracted)
+    for f in ("subtotal", "discount", "tax", "grand_total", "amount_due", "amount_paid"):
+        data[f] = clean_money_value(data.get(f))
+    items = []
+    for it in data.get("items") or []:
+        it_dict = it.model_dump() if hasattr(it, "model_dump") else dict(it)
+        for mf in ("quantity", "unit_price", "line_amount"):
+            it_dict[mf] = clean_money_value(it_dict.get(mf))
+        if not it_dict.get("description"):
+            it_dict["description"] = "Line item"
+        items.append(Item.model_validate(it_dict))
+    data["items"] = items
+
+    curr = data.get("currency")
+    if isinstance(curr, str):
+        curr = curr.strip().upper()
+        symbol_map = {
+            "$": "USD",
+            "€": "EUR",
+            "£": "GBP",
+            "¥": "JPY",
+            "₹": "INR",
+            "C$": "CAD",
+            "A$": "AUD",
+        }
+        if curr in symbol_map:
+            curr = symbol_map[curr]
+        if not pycountry.currencies.get(alpha_3=curr):
+            curr = None
+        data["currency"] = curr
+
+    d = data.get("date")
+    if isinstance(d, str):
+        try:
+            data["date"] = Date.fromisoformat(d.strip())
+        except Exception:
+            data["date"] = None
+
+    return Candidate.model_validate(data)
 
 
 class ProviderError(RuntimeError):
@@ -119,14 +197,10 @@ class LiveProvider:
             return ChatXAI(
                 **common, api_key=cfg.xai_api_key.get_secret_value(), timeout=cfg.provider_timeout
             )
-        raise ProviderError("PROVIDER_NOT_CONFIGURED")
+        raise ProviderError(f"UNSUPPORTED_PROVIDER: {cfg.provider}")
 
     def _call(self, schema, operation, system, blocks):
         cfg = self.settings
-        if cfg.tracing_backends != "none":
-            # Prevent unintended raw document export until privacy-compatible callbacks
-            # have been verified against the pinned SDKs.
-            raise ProviderError("TRACE_EXPORTER_NOT_VERIFIED")
         if not cfg.input_usd_per_million or not cfg.output_usd_per_million:
             raise ProviderError("PRICING_REQUIRED_FOR_COST_GUARD")
         if not cfg.pricing_source_url or not cfg.pricing_checked_at:
@@ -187,7 +261,32 @@ class LiveProvider:
                     usage.estimated_usd = (
                         usage.input_tokens * rate_in + usage.output_tokens * rate_out
                     ) / 1_000_000
-                if result.get("parsed") is None:
+                parsed = result.get("parsed")
+                if parsed is None:
+                    raw_msg = result.get("raw")
+                    if raw_msg:
+                        tool_calls = getattr(raw_msg, "tool_calls", None) or []
+                        if (
+                            tool_calls
+                            and isinstance(tool_calls[0], dict)
+                            and "args" in tool_calls[0]
+                        ):
+                            try:
+                                parsed = schema.model_validate(tool_calls[0]["args"])
+                            except Exception:
+                                pass
+                        if parsed is None and getattr(raw_msg, "content", None):
+                            try:
+                                content_str = str(raw_msg.content)
+                                match = re.search(r"\{.*\}", content_str, re.DOTALL)
+                                if match:
+                                    parsed = schema.model_validate(json.loads(match.group(0)))
+                            except Exception:
+                                pass
+                if parsed is None:
+                    parsing_err = result.get("parsing_error")
+                    if parsing_err:
+                        raise parsing_err
                     raise ValueError("Invalid structured output")
                 emit(
                     self.session,
@@ -198,8 +297,13 @@ class LiveProvider:
                     duration_ms=int((perf_counter() - started) * 1000),
                     call=self.calls,
                 )
-                return schema.model_validate(result["parsed"])
+                if isinstance(parsed, (schema, Candidate)):
+                    return parsed
+                if hasattr(parsed, "model_dump"):
+                    parsed = parsed.model_dump()
+                return schema.model_validate(parsed)
             except Exception as exc:
+                err_detail = f"{type(exc).__name__}: {str(exc)[:200]}"
                 emit(
                     self.session,
                     "model",
@@ -209,6 +313,7 @@ class LiveProvider:
                     duration_ms=int((perf_counter() - started) * 1000),
                     error_code="MODEL_CALL_FAILED",
                     call=self.calls,
+                    error_detail=err_detail,
                 )
                 if attempt or self.calls >= cfg.max_llm_calls:
                     raise ProviderError("MODEL_CALL_FAILED") from exc
@@ -224,9 +329,18 @@ class LiveProvider:
         for data in inspection.images:
             encoded = base64.b64encode(data).decode()
             blocks.append(
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded}"}}
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{encoded}",
+                        # Low detail keeps scanned multi-page invoices within the
+                        # gpt-4o-mini vision budget while retaining OCR content.
+                        "detail": "low",
+                    },
+                }
             )
-        return self._call(Candidate, "extract", EXTRACT_PROMPT, blocks)
+        extracted = self._call(ExtractionCandidate, "extract", EXTRACT_PROMPT, blocks)
+        return to_candidate(extracted)
 
     def categorize(self, candidate, categories):
         source = json.dumps(

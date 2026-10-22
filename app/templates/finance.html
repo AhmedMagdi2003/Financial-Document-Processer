@@ -8,15 +8,11 @@
 <a class="button secondary" href="/api/v1/expenses.csv?project={{ filters.project|urlencode }}&category={{ filters.category|urlencode }}&currency={{ filters.currency|urlencode }}">↓ Export tracker</a>
 </div>
 <section class="metrics" aria-label="Financial summary">
-{% for currency, amount in summary.totals.items() %}<div class="metric">
-<span>Confirmed spend · {{ currency }}</span>
-<strong>{{ amount }}</strong>
-<small>Confirmed records only</small>
-</div>{% else %}<div class="metric">
-<span>Confirmed spend</span>
-<strong>—</strong>
-<small>Confirm your first document to begin</small>
-</div>{% endfor %}
+<div class="metric report-total-metric">
+<span>Confirmed spend · converted to {{ report_currency }}</span>
+<strong id="report-total">Loading rates…</strong>
+<small id="report-rate-date">Original amounts remain unchanged</small>
+</div>
 <a class="metric" href="/review">
 <span>Awaiting review</span>
 <strong>{{ documents|selectattr('state','equalto','NEEDS_REVIEW')|list|length }}</strong>
@@ -111,7 +107,7 @@
       <h2>Spend Over Time</h2>
       <span class="tag">Timeline Bar Chart</span>
     </div>
-    <p class="muted">Monthly confirmed expenditure timeline.</p>
+    <p class="muted">Monthly confirmed expenditure converted to {{ report_currency }}.</p>
     <div style="position:relative; height:240px; width:100%;">
       <canvas id="chart-timeline"></canvas>
     </div>
@@ -122,7 +118,7 @@
       <h2>Spend by Category</h2>
       <span class="tag">Category Numbers & Slices</span>
     </div>
-    <p class="muted">Expenditures by category with direct amounts on each slice.</p>
+    <p class="muted">Expenditures by category, converted to {{ report_currency }}.</p>
     <div style="position:relative; height:240px; width:100%;">
       <canvas id="chart-categories"></canvas>
     </div>
@@ -155,7 +151,10 @@
 <label>Category<select name="category">
 <option value="">All categories</option>{% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if filters.category == c.id }}>{{ c.name }}</option>{% endfor %}</select>
 </label>
-<label>Currency<input name="currency" maxlength="3" placeholder="e.g. EUR" value="{{ filters.currency }}">
+<label>Currency<select name="currency">
+<option value="">All currencies</option>
+{% for code in available_currencies %}<option value="{{ code }}" {{ 'selected' if filters.currency == code }}>{{ code }}</option>{% endfor %}
+</select>
 </label>
 <label>From<input type="date" name="start" value="{{ filters.start }}">
 </label>
@@ -203,6 +202,7 @@
 <td>{{ e.confirmed_at.strftime('%Y-%m-%d %H:%M') if e.confirmed_at else '—' }}</td>
 <td class="number">
 <strong>{{ e.total }} {{ e.currency }}</strong>
+<small class="converted-expense" data-convert-id="{{ e.id }}"></small>
 </td>
 <td style="display:flex; gap:6px; align-items:center;">
 <a href="/documents/{{ e.document_id }}" class="button secondary" style="padding:4px 8px; font-size:12px;">View ↗</a>
@@ -215,31 +215,30 @@
 </div>
 </section>
 
+<section class="panel exchange-details" aria-live="polite">
+<div class="panel-title"><h2>Exchange rate details</h2><span class="tag"><a href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer">ExchangeRate-API Open Access · free</a></span></div>
+<p id="rate-date" class="muted">Loading the latest available daily rate…</p>
+<div id="exchange-rate-pairs" class="rate-breakdown"></div>
+<div id="source-currency-totals" class="rate-breakdown"></div>
+<p class="muted">Converted amounts are for reporting only. Original invoice and database amounts are preserved.</p>
+</section>
+
 <div class="grid equal">
 <section class="panel">
 <h2>Spend by category (table)</h2>
-<p class="muted">Select one currency above to focus the distribution. Every currency stays separate.</p>{% for c in summary.categories %}<div class="distribution">
-<span>{{ c.category|title }} <small>{{ c.currency }}</small>
-</span>
-<strong>{{ c.total }}</strong>
-</div>
-<meter value="{{ c.total }}" max="{{ summary.totals[c.currency] }}" aria-label="{{ c.category }} {{ c.currency }}">
-</meter>{% else %}<p class="empty">Category distribution appears after confirmation.</p>{% endfor %}</section>
+<p class="muted">Converted and combined across source currencies.</p><div id="converted-categories"></div></section>
 <section class="panel">
 <h2>Spend over time (table)</h2>
-<p class="muted">Document month · confirmed expenses</p>{% for t in summary.timeline %}<div class="distribution">
-<span>{{ t.month }} <small>{{ t.currency }}</small>
-</span>
-<strong>{{ t.total }}</strong>
-</div>
-<meter value="{{ t.total }}" max="{{ summary.totals[t.currency] }}" aria-label="{{ t.month }} {{ t.currency }}">
-</meter>{% else %}<p class="empty">Your monthly spending will appear here.</p>{% endfor %}</section>
+<p class="muted">Converted to the selected reporting currency.</p><div id="converted-timeline"></div></section>
 </div>
 
 <script id="finance-chart-data" type="application/json">
 {
   "summary": {{ summary|tojson }},
-  "pipeline": {{ pipeline_stats|tojson }}
+  "pipeline": {{ pipeline_stats|tojson }},
+  "reportCurrency": {{ report_currency|tojson }},
+  "sourceCurrencies": {{ source_currencies|tojson }},
+  "expenses": {{ expense_conversion_data|tojson }}
 }
 </script>
 {% endblock %}

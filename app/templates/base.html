@@ -41,6 +41,10 @@
 <div class="workspace">
 <header class="topbar">
 <span>Internal workspace <span class="slash">/</span> {% block crumb %}Overview{% endblock %}</span>
+<label class="report-currency-control" for="report-currency">Reporting currency
+<select id="report-currency" aria-label="Reporting currency">
+{% for code in ['USD', 'EUR', 'EGP'] %}<option value="{{ code }}" {{ 'selected' if report_currency == code }}>{{ code }}</option>{% endfor %}
+</select></label>
 <span class="avatar" title="Internal reviewer">IR</span>
 </header>
 <main id="main">

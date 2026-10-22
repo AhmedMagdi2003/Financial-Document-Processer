@@ -1,3 +1,4 @@
+import re
 from datetime import date as Date
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Literal
@@ -6,10 +7,47 @@ import pycountry
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 
 
+def clean_money_value(val):
+    if val is None or val == "":
+        return None
+    if isinstance(val, (int, float)):
+        return f"{val:.2f}" if isinstance(val, float) else f"{val}.00"
+    if isinstance(val, str):
+        s = val.strip()
+        if s.lower() in ("nan", "infinity", "-infinity", "+infinity"):
+            return s
+        if not re.search(r"\d", s):
+            return s
+        negative = False
+        if s.startswith("(") and s.endswith(")"):
+            negative = True
+            s = s[1:-1].strip()
+        s = re.sub(r"[\$\€\£\¥\₹]", "", s).strip()
+        if s.startswith("-"):
+            negative = True
+            s = s[1:].strip()
+        if "," in s and "." in s:
+            s = s.replace(",", "")
+        elif "," in s:
+            parts = s.split(",")
+            if len(parts) == 2 and len(parts[1]) in (2, 3, 4):
+                s = parts[0] + "." + parts[1]
+            else:
+                s = s.replace(",", "")
+        s = re.sub(r"^[^\d.]+", "", s)
+        s = re.sub(r"[^\d]+$", "", s)
+        if not s:
+            return val
+        return f"-{s}" if negative else s
+    return str(val)
+
+
 def exact_money(value):
     if isinstance(value, float):
         raise ValueError("Money must be a decimal string, never a float")
     if value is not None:
+        if isinstance(value, str):
+            value = clean_money_value(value)
         try:
             number = Decimal(value)
         except (InvalidOperation, TypeError) as exc:

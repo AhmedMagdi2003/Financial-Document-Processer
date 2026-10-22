@@ -383,33 +383,9 @@ function initFinanceCharts() {
       const catValues = summary.categories.map(c => parseFloat(c.total) || 0);
       const colors = ['#1e6255', '#2563eb', '#0d9488', '#d97706', '#16a34a', '#8b5cf6', '#ec4899', '#64748b'];
 
-      // Custom plugin to draw numbers directly on pie/doughnut slices
-      const pieSliceLabels = {
-        id: 'pieSliceLabels',
-        afterDatasetsDraw(chart) {
-          const { ctx, data } = chart;
-          const total = data.datasets[0].data.reduce((a, b) => a + Number(b), 0);
-          chart.getDatasetMeta(0).data.forEach((element, index) => {
-            const val = Number(data.datasets[0].data[index]) || 0;
-            if (val <= 0) return;
-            const pct = total > 0 ? ((val / total) * 100).toFixed(0) + '%' : '';
-            const pos = element.tooltipPosition();
-            ctx.save();
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 11px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-            ctx.shadowBlur = 3;
-            ctx.fillText(`${val.toFixed(1)} (${pct})`, pos.x, pos.y);
-            ctx.restore();
-          });
-        }
-      };
-
-      new Chart(catEl, {
+new Chart(catEl, {
         type: 'doughnut',
-        plugins: [pieSliceLabels],
+        
         data: {
           labels: catLabels.length ? catLabels : ['Uncategorized'],
           datasets: [{
@@ -554,13 +530,140 @@ function camelCase(str) {
   return str.replace(/-([a-z])/g, g => g[1].toUpperCase());
 }
 
+function initReportingCurrency() {
+  const selector = document.querySelector('#report-currency');
+  if (!selector) return;
+  selector.addEventListener('change', () => {
+    const url = new URL(location.href);
+    url.searchParams.set('report_currency', selector.value);
+    location.href = url.toString();
+  });
+
+  const dataEl = document.querySelector('#finance-chart-data');
+  if (!dataEl) return;
+  const data = JSON.parse(dataEl.textContent);
+  const target = data.reportCurrency || 'USD';
+  const sources = data.sourceCurrencies || [];
+  const values = data.expenses || [];
+  const symbols = sources.filter(code => code !== target).join(',');
+  const rateUrl = `/api/v1/exchange-rates?base=${encodeURIComponent(target)}&symbols=${encodeURIComponent(symbols)}`;
+  fetch(rateUrl).then(response => {
+    if (!response.ok) throw new Error('Rates unavailable');
+    return response.json();
+  }).then(result => {
+    const rates = { [target]: 1, ...result.rates };
+    const dateText = `Rates updated ${result.updated_at || result.date} · Source: ExchangeRate-API Open Access`;
+    const rateDate = document.querySelector('#rate-date');
+    if (rateDate) rateDate.textContent = dateText;
+    const metricDate = document.querySelector('#report-rate-date');
+    if (metricDate) metricDate.textContent = `Rates dated ${result.date}`;
+    const ratePairs = document.querySelector('#exchange-rate-pairs');
+    if (ratePairs) {
+      ratePairs.replaceChildren();
+      for (const source of sources.filter(code => code !== target)) {
+        const sourcePerTarget = Number(rates[source]);
+        const row = document.createElement('div');
+        row.className = 'distribution';
+        const label = document.createElement('span');
+        label.textContent = `1 ${source} =`;
+        const value = document.createElement('strong');
+        value.textContent = Number.isFinite(sourcePerTarget) && sourcePerTarget > 0
+          ? `${new Intl.NumberFormat(undefined, { maximumSignificantDigits: 8 }).format(1 / sourcePerTarget)} ${target}`
+          : `Rate unavailable in ${target}`;
+        row.append(label, value);
+        ratePairs.append(row);
+      }
+      if (!sources.some(code => code !== target)) ratePairs.textContent = `1 ${target} = 1 ${target}`;
+    }
+
+    const converted = values.map(item => {
+      const sourceUnitsPerTarget = Number(rates[item.currency]);
+      return { ...item, converted: Number.isFinite(sourceUnitsPerTarget) && sourceUnitsPerTarget > 0
+        ? Number(item.amount) / sourceUnitsPerTarget : null };
+    });
+    const fmt = amount => new Intl.NumberFormat(undefined, { style: 'currency', currency: target }).format(amount);
+    const sum = rows => rows.reduce((total, item) => total + (item.converted ?? 0), 0);
+    const total = sum(converted.filter(item => item.converted !== null));
+    const totalEl = document.querySelector('#report-total');
+    if (totalEl) totalEl.textContent = fmt(total);
+
+    const sourceTotals = new Map();
+    const sourceConverted = new Map();
+    for (const item of converted) {
+      sourceTotals.set(item.currency, (sourceTotals.get(item.currency) || 0) + Number(item.amount));
+      if (item.converted !== null) sourceConverted.set(item.currency, (sourceConverted.get(item.currency) || 0) + item.converted);
+      const cell = document.querySelector(`[data-convert-id="${CSS.escape(item.id)}"]`);
+      if (cell) cell.textContent = item.converted === null ? `Conversion unavailable to ${target}` : `≈ ${fmt(item.converted)}`;
+    }
+    const details = document.querySelector('#source-currency-totals');
+    if (details) {
+      details.replaceChildren();
+      for (const [code, amount] of sourceTotals) {
+        const row = document.createElement('div');
+        row.className = 'distribution';
+        const label = document.createElement('span');
+        label.textContent = `${code} source total`;
+        const value = document.createElement('strong');
+        const convertedAmount = sourceConverted.get(code);
+        value.textContent = `${new Intl.NumberFormat(undefined, { style: 'currency', currency: code }).format(amount)}  →  ${convertedAmount === undefined ? 'rate unavailable' : fmt(convertedAmount)}`;
+        row.append(label, value);
+        details.append(row);
+      }
+      if (!sourceTotals.size) details.textContent = 'No confirmed expenses in this view.';
+    }
+    for (const [containerId, key] of [['converted-categories', 'category'], ['converted-timeline', 'month']]) {
+      const aggregate = new Map();
+      converted.forEach(item => {
+        if (item.converted === null) return;
+        aggregate.set(item[key], (aggregate.get(item[key]) || 0) + item.converted);
+      });
+      const container = document.querySelector(`#${containerId}`);
+      if (!container) continue;
+      container.replaceChildren();
+      for (const [labelText, amount] of [...aggregate].sort(([a], [b]) => a.localeCompare(b))) {
+        const row = document.createElement('div');
+        row.className = 'distribution';
+        const label = document.createElement('span');
+        label.textContent = key === 'category' ? labelText.replaceAll('_', ' ') : labelText;
+        const value = document.createElement('strong');
+        value.textContent = fmt(amount);
+        row.append(label, value);
+        container.append(row);
+      }
+      if (!aggregate.size) container.textContent = 'No converted records available.';
+    }
+
+    const categoryTotals = new Map();
+    const monthTotals = new Map();
+    converted.forEach(item => {
+      if (item.converted === null) return;
+      categoryTotals.set(item.category, (categoryTotals.get(item.category) || 0) + item.converted);
+      monthTotals.set(item.month, (monthTotals.get(item.month) || 0) + item.converted);
+    });
+    data.summary = {
+      totals: { [target]: String(total) },
+      categories: [...categoryTotals].map(([category, amount]) => ({ category, currency: target, total: String(amount) })),
+      timeline: [...monthTotals].sort(([a], [b]) => a.localeCompare(b)).map(([month, amount]) => ({ month, currency: target, total: String(amount) })),
+      count: values.length,
+    };
+    initFinanceCharts();
+  }).catch(() => {
+    const totalEl = document.querySelector('#report-total');
+    if (totalEl) totalEl.textContent = 'Exchange rate unavailable';
+    const dateEl = document.querySelector('#rate-date');
+    if (dateEl) dateEl.textContent = 'Could not load a rate. Original currency amounts are still shown above.';
+    const metricDate = document.querySelector('#report-rate-date');
+    if (metricDate) metricDate.textContent = 'Try again later; no estimated rate was applied.';
+  });
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    initFinanceCharts();
     initTableSorting();
+    initReportingCurrency();
   });
 } else {
-  initFinanceCharts();
   initTableSorting();
+  initReportingCurrency();
 }
 
