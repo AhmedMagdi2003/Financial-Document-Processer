@@ -1,6 +1,6 @@
 # Financial Document Assistant
 
-A financial operations application for turning invoice and receipt files into reviewable expense records, tracking project spending, and synchronizing approved data with connected services.
+Upload invoices and receipts to extract expense details, check totals, and track project spending. Unclear documents go to a review queue. Approved expenses can sync to connected services.
 
 ---
 
@@ -28,20 +28,20 @@ flowchart TD
         CatCheck["Auto-Categorization & Policy Tagging"]
     end
 
-    subgraph Decision["4. Autonomous Routing Gate"]
+    subgraph Decision["4. Record or Review"]
         Gate{"Critical Issues == 0\n& AUTO_RECORD == True?"}
-        AutoRecord["State: RECORDED\nAuto-record into confirmed expenses"]
+        AutoRecord["State: RECORDED\nRecord eligible expenses"]
         Quarantine["State: NEEDS_REVIEW\nQuarantine in Review Queue"]
     end
 
     subgraph Review["5. Human Review & Multi-User Audit"]
         ReviewQueue["Web Review Queue\n(/review, /documents/{id})"]
-        AuditTrail["Audit Log & Token Attribution\n(Actor: Sarah Connor / Ahmed Ali)"]
+        AuditTrail["Audit Log & Reviewer Attribution"]
         Resolution["Manual Edit / Re-extract / Confirm / Dismiss"]
     end
 
     subgraph Delivery["6. Downstream Delivery & Storage"]
-        SheetsSync["Google Sheets Webhook Sync\n(100% Free Apps Script)"]
+        SheetsSync["Google Sheets Sync\n(Apps Script)"]
         Postgres[("Supabase PostgreSQL\n(Row Level Security Enabled)")]
         Storage[("Supabase Originals Bucket\n(PDFs & Raw Images)")]
     end
@@ -130,9 +130,7 @@ uv run python scripts/manage_tokens.py list
 uv run python scripts/manage_tokens.py revoke <token_string>
 ```
 
-When Sarah Connor signs in using her token (`tok_sarah_connor_...`):
-- Her web session is bound to `Sarah Connor`.
-- Every invoice upload, confirmation, line-item edit, or deletion stores `actor: "Sarah Connor"` in the audit timeline.
+When a team member signs in with their token, their name is recorded with actions such as uploads, confirmations, edits, and deletions.
 
 ---
 
